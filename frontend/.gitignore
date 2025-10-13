@@ -1,24 +1,144 @@
+# Dependencies
+node_modules/
+/.pnp
+.pnp.js
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Testing
+/coverage
+*.lcov
+.nyc_output
+
+# Production Build
+/build
+/dist
+/.next
+/out
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env*.local
+!.env.example
+
+# IDE and Editor Files
+.vscode/
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+*.sublime-project
+*.sublime-workspace
+.vscode-test
+
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 lerna-debug.log*
+.pnpm-debug.log*
 
-node_modules
-dist
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Cache and Temporary Files
+.cache/
+.parcel-cache/
+.npm
+.eslintcache
+.stylelintcache
+.node_repl_history
+*.tsbuildinfo
+.temp
+.tmp
+*.tmp
+
+# React / Create React App
+/build
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vite
 dist-ssr
 *.local
+.vite
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
-.DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# Next.js
+.next/
+out/
+.vercel
+.swc/
+
+# Gatsby
+.cache/
+public
+
+# Nuxt.js
+.nuxt
+dist
+
+# Storybook
+storybook-static
+
+# Webpack
+.webpack/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Misc
+*.pem
+*.key
+*.cert
+.turbo
+.vercel
+.netlify
+
+# Service Worker
+sw.js
+workbox-*.js
+
+# PWA
+manifest.json.map
+
+# Source Maps (optional - uncomment if you don't want to commit them)
+# *.map
+
+# Storybook
+storybook-static/
+
+# Cypress
+cypress/videos/
+cypress/screenshots/
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
