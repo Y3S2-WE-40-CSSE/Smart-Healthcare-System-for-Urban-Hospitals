@@ -23,6 +23,7 @@ const registerUser = async (req, res) => {
       password, 
       role, 
       contactInfo,
+      nicNumber, // Add this
       department,
       DOB,
       address,
@@ -39,6 +40,17 @@ const registerUser = async (req, res) => {
       });
     }
 
+    // Check if NIC number exists (if provided)
+    if (nicNumber) {
+      const existingNIC = await User.findOne({ nicNumber });
+      if (existingNIC) {
+        return res.status(400).json({
+          success: false,
+          message: 'User with this NIC number already exists'
+        });
+      }
+    }
+
     // Only allow patient and staff registration through this endpoint
     if (role && !['patient', 'staff'].includes(role)) {
       return res.status(400).json({
@@ -53,7 +65,8 @@ const registerUser = async (req, res) => {
       email,
       password,
       role: role || 'patient',
-      contactInfo
+      contactInfo,
+      nicNumber: nicNumber || `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` // Ensure unique value
     };
 
     // Add role-specific fields
@@ -74,7 +87,7 @@ const registerUser = async (req, res) => {
       const healthCard = await DigitalHealthCard.create({
         patientID: user._id,
         QRCode: `QR_${user._id}_${Date.now()}`,
-        issuedBy: user._id // Self-issued for now
+        issuedBy: user._id
       });
     }
 
