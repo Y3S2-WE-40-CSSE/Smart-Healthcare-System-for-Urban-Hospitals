@@ -29,6 +29,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Please provide contact information']
   },
+  // Add this field to match the database
+  nicNumber: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   // Doctor/Staff specific fields
   department: {
     type: String,

@@ -4,16 +4,22 @@ import { Link, useNavigate } from 'react-router-dom';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    role: 'patient',
-    contactInfo: {
-      phone: '',
-      address: ''
-    }
-  });
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
+  role: 'patient',
+  contactInfo: '',
+  nicNumber: '', // Add this line
+  department: '',
+  specialization: '',
+  licenseNumber: '',
+  DOB: '',
+  address: '',
+  allergies: '',
+  medicalHistory: ''
+});
+
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
@@ -22,21 +28,10 @@ const RegisterForm = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    if (name.includes('.')) {
-      const [parent, child] = name.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent],
-          [child]: value
-        }
-      }));
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [name]: value
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -51,7 +46,32 @@ const RegisterForm = () => {
       return;
     }
 
-    const result = await register(formData);
+    // Prepare data for backend - remove confirmPassword and handle optional fields
+    const submitData = { ...formData };
+    delete submitData.confirmPassword;
+
+    // Remove licenseNumber for non-doctor roles to avoid unique constraint issues
+    if (submitData.role !== 'doctor') {
+      delete submitData.licenseNumber;
+      delete submitData.specialization;
+    }
+
+    // Remove department for non-staff/doctor/admin roles
+    if (!['staff', 'doctor', 'admin'].includes(submitData.role)) {
+      delete submitData.department;
+    }
+
+    // Remove patient-specific fields for non-patient roles
+    if (submitData.role !== 'patient') {
+      delete submitData.DOB;
+      delete submitData.address;
+    }
+
+    // Set default values for optional fields
+    if (!submitData.allergies) submitData.allergies = 'None';
+    if (!submitData.medicalHistory) submitData.medicalHistory = 'No significant medical history';
+
+    const result = await register(submitData);
     
     if (result.success) {
       navigate('/dashboard');
@@ -122,6 +142,23 @@ const RegisterForm = () => {
             </div>
 
             <div>
+              <label htmlFor="nicNumber" className="block text-sm font-medium text-gray-700">
+                NIC Number
+              </label>
+              <input
+                id="nicNumber"
+                name="nicNumber"
+                type="text"
+                required
+                className="input-field"
+                placeholder="Enter your NIC number"
+                value={formData.nicNumber}
+                onChange={handleChange}
+              />
+              {errors.nicNumber && <p className="text-red-500 text-sm mt-1">{errors.nicNumber}</p>}
+            </div>
+
+            <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">
                 Role
               </label>
@@ -134,42 +171,154 @@ const RegisterForm = () => {
               >
                 <option value="patient">Patient</option>
                 <option value="staff">Staff</option>
+                <option value="doctor">Doctor</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
 
             <div>
-              <label htmlFor="contactInfo.phone" className="block text-sm font-medium text-gray-700">
-                Phone Number
+              <label htmlFor="contactInfo" className="block text-sm font-medium text-gray-700">
+                Contact Information
               </label>
               <input
-                id="contactInfo.phone"
-                name="contactInfo.phone"
-                type="tel"
+                id="contactInfo"
+                name="contactInfo"
+                type="text"
                 required
                 className="input-field"
-                placeholder="Enter your phone number"
-                value={formData.contactInfo.phone}
+                placeholder="Enter your contact information"
+                value={formData.contactInfo}
                 onChange={handleChange}
               />
-              {errors['contactInfo.phone'] && <p className="text-red-500 text-sm mt-1">{errors['contactInfo.phone']}</p>}
+              {errors.contactInfo && <p className="text-red-500 text-sm mt-1">{errors.contactInfo}</p>}
             </div>
 
-            <div>
-              <label htmlFor="contactInfo.address" className="block text-sm font-medium text-gray-700">
-                Address
-              </label>
-              <textarea
-                id="contactInfo.address"
-                name="contactInfo.address"
-                required
-                className="input-field"
-                placeholder="Enter your address"
-                rows="3"
-                value={formData.contactInfo.address}
-                onChange={handleChange}
-              />
-              {errors['contactInfo.address'] && <p className="text-red-500 text-sm mt-1">{errors['contactInfo.address']}</p>}
-            </div>
+            {/* Patient-specific fields */}
+            {formData.role === 'patient' && (
+              <>
+                <div>
+                  <label htmlFor="DOB" className="block text-sm font-medium text-gray-700">
+                    Date of Birth
+                  </label>
+                  <input
+                    id="DOB"
+                    name="DOB"
+                    type="date"
+                    required
+                    className="input-field"
+                    value={formData.DOB}
+                    onChange={handleChange}
+                  />
+                  {errors.DOB && <p className="text-red-500 text-sm mt-1">{errors.DOB}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                    Address
+                  </label>
+                  <input
+                    id="address"
+                    name="address"
+                    type="text"
+                    required
+                    className="input-field"
+                    placeholder="Enter your address"
+                    value={formData.address}
+                    onChange={handleChange}
+                  />
+                  {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="allergies" className="block text-sm font-medium text-gray-700">
+                    Allergies
+                  </label>
+                  <input
+                    id="allergies"
+                    name="allergies"
+                    type="text"
+                    className="input-field"
+                    placeholder="List any allergies (optional)"
+                    value={formData.allergies}
+                    onChange={handleChange}
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="medicalHistory" className="block text-sm font-medium text-gray-700">
+                    Medical History
+                  </label>
+                  <textarea
+                    id="medicalHistory"
+                    name="medicalHistory"
+                    className="input-field"
+                    placeholder="Enter medical history (optional)"
+                    rows="3"
+                    value={formData.medicalHistory}
+                    onChange={handleChange}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Staff/Doctor/Admin specific fields */}
+            {(formData.role === 'staff' || formData.role === 'doctor' || formData.role === 'admin') && (
+              <div>
+                <label htmlFor="department" className="block text-sm font-medium text-gray-700">
+                  Department
+                </label>
+                <input
+                  id="department"
+                  name="department"
+                  type="text"
+                  required
+                  className="input-field"
+                  placeholder="Enter your department"
+                  value={formData.department}
+                  onChange={handleChange}
+                />
+                {errors.department && <p className="text-red-500 text-sm mt-1">{errors.department}</p>}
+              </div>
+            )}
+
+            {/* Doctor-specific fields */}
+            {formData.role === 'doctor' && (
+              <>
+                <div>
+                  <label htmlFor="specialization" className="block text-sm font-medium text-gray-700">
+                    Specialization
+                  </label>
+                  <input
+                    id="specialization"
+                    name="specialization"
+                    type="text"
+                    required
+                    className="input-field"
+                    placeholder="Enter your specialization"
+                    value={formData.specialization}
+                    onChange={handleChange}
+                  />
+                  {errors.specialization && <p className="text-red-500 text-sm mt-1">{errors.specialization}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">
+                    License Number
+                  </label>
+                  <input
+                    id="licenseNumber"
+                    name="licenseNumber"
+                    type="text"
+                    required
+                    className="input-field"
+                    placeholder="Enter your license number"
+                    value={formData.licenseNumber}
+                    onChange={handleChange}
+                  />
+                  {errors.licenseNumber && <p className="text-red-500 text-sm mt-1">{errors.licenseNumber}</p>}
+                </div>
+              </>
+            )}
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
