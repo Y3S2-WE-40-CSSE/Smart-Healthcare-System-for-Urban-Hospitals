@@ -1,4 +1,6 @@
 const PatientRegistrationService = require('../services/patientRegistrationService');
+const PatientRepository = require('../repositories/patientRepository');
+const HealthCardRepository = require('../repositories/healthCardRepository');
 const ValidationService = require('../services/validationService');
 const ErrorHandlerService = require('../services/errorHandlerService');
 
@@ -97,12 +99,7 @@ const getHealthCard = async (req, res) => {
  */
 const getAllPatients = async (req, res) => {
   try {
-    const User = require('../models/userModel');
-    
-    // Get all users with role 'patient'
-    const patients = await User.find({ role: 'patient' })
-      .select('-password')
-      .sort({ createdAt: -1 }); // Most recent first
+    const patients = await PatientRepository.findAll();
     
     const response = ErrorHandlerService.createSuccessResponse(
       'Patients retrieved successfully',
@@ -123,19 +120,8 @@ const getAllPatients = async (req, res) => {
  */
 const updatePatient = async (req, res) => {
   try {
-    const User = require('../models/userModel');
     const { patientId } = req.params;
     
-    // Find patient
-    const patient = await User.findById(patientId);
-    
-    if (!patient || patient.role !== 'patient') {
-      return res.status(404).json({
-        success: false,
-        message: 'Patient not found'
-      });
-    }
-
     // Fields that can be updated
     const allowedUpdates = [
       'name', 'email', 'contactInfo', 'DOB', 'address', 
@@ -143,14 +129,15 @@ const updatePatient = async (req, res) => {
       'emergencyContact', 'gender', 'nicNumber'
     ];
 
-    // Update only allowed fields
+    // Filter only allowed fields
+    const updateData = {};
     allowedUpdates.forEach(field => {
       if (req.body[field] !== undefined) {
-        patient[field] = req.body[field];
+        updateData[field] = req.body[field];
       }
     });
 
-    await patient.save();
+    const patient = await PatientRepository.update(patientId, updateData);
 
     const response = ErrorHandlerService.createSuccessResponse(
       'Patient updated successfully',
@@ -159,6 +146,12 @@ const updatePatient = async (req, res) => {
 
     res.status(200).json(response);
   } catch (error) {
+    if (error.message === 'Patient not found') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
     const errorResponse = ErrorHandlerService.handleError(error, 'Update Patient');
     res.status(500).json(errorResponse);
   }
@@ -171,12 +164,10 @@ const updatePatient = async (req, res) => {
  */
 const deletePatient = async (req, res) => {
   try {
-    const User = require('../models/userModel');
-    const DigitalHealthCard = require('../models/digitalHealthCardModel');
     const { patientId } = req.params;
     
-    // Find patient
-    const patient = await User.findById(patientId);
+    // Find patient to verify existence
+    const patient = await PatientRepository.findById(patientId);
     
     if (!patient || patient.role !== 'patient') {
       return res.status(404).json({
@@ -185,11 +176,11 @@ const deletePatient = async (req, res) => {
       });
     }
 
-    // Delete associated health card if exists
-    await DigitalHealthCard.findOneAndDelete({ patient: patientId });
+    // Delete associated health card
+    await HealthCardRepository.deleteByPatientId(patientId);
 
     // Delete patient
-    await User.findByIdAndDelete(patientId);
+    await PatientRepository.delete(patientId);
 
     res.status(200).json({
       success: true,

@@ -1,60 +1,21 @@
-const User = require('../models/userModel');
-const DigitalHealthCard = require('../models/digitalHealthCardModel');
+const PatientRepository = require('../repositories/patientRepository');
+const HealthCardRepository = require('../repositories/healthCardRepository');
 const QRCodeService = require('./qrCodeService');
 const NotificationService = require('./notificationService');
-const ValidationService = require('./validationService');
+const PatientValidator = require('../validators/patientValidator');
+const PasswordUtils = require('../utils/passwordUtils');
 
 /**
- * PatientRegistrationService - Handles staff-initiated patient registration
- * Follows Single Responsibility Principle - Only handles patient registration logic
- * Follows Open/Closed Principle - Extensible without modification
- * Follows Dependency Inversion - Depends on abstractions (services)
+ * PatientRegistrationService - Orchestrates patient registration
+ * Follows Single Responsibility Principle
+ * Follows Dependency Inversion - Depends on repositories (abstractions)
  */
 class PatientRegistrationService {
-  /**
-   * Validate patient registration data
-   * @param {Object} patientData - Patient information
-   * @returns {Object} - Validation result
-   */
-  validatePatientData(patientData) {
-    const errors = [];
-
-    // Required fields for patients
-    const requiredFields = ['name', 'email', 'contactInfo', 'DOB', 'address'];
-    
-    requiredFields.forEach(field => {
-      if (!patientData[field] || patientData[field].toString().trim() === '') {
-        errors.push({
-          field: field,
-          message: `${field} is required`
-        });
-      }
-    });
-
-    // Email validation
-    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
-    if (patientData.email && !emailRegex.test(patientData.email)) {
-      errors.push({
-        field: 'email',
-        message: 'Please provide a valid email address'
-      });
-    }
-
-    // DOB validation (must be in the past)
-    if (patientData.DOB) {
-      const dob = new Date(patientData.DOB);
-      if (dob >= new Date()) {
-        errors.push({
-          field: 'DOB',
-          message: 'Date of birth must be in the past'
-        });
-      }
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors: errors
-    };
+  constructor(patientRepo, healthCardRepo, qrService, notificationService) {
+    this.patientRepo = patientRepo;
+    this.healthCardRepo = healthCardRepo;
+    this.qrService = qrService;
+    this.notificationService = notificationService;
   }
 
   /**
@@ -64,7 +25,7 @@ class PatientRegistrationService {
    * @returns {Promise<Object>} - Existence check result
    */
   async checkPatientExists(email, nicNumber) {
-    const existingEmail = await User.findOne({ email, role: 'patient' });
+    const existingEmail = await this.patientRepo.findByEmail(email);
     if (existingEmail) {
       return {
         exists: true,
@@ -74,7 +35,7 @@ class PatientRegistrationService {
     }
 
     if (nicNumber) {
-      const existingNIC = await User.findOne({ nicNumber, role: 'patient' });
+      const existingNIC = await this.patientRepo.findByNIC(nicNumber);
       if (existingNIC) {
         return {
           exists: true,
@@ -88,62 +49,6 @@ class PatientRegistrationService {
   }
 
   /**
-   * Prepare patient data for creation
-   * @param {Object} requestData - Raw request data
-   * @param {String} staffId - Staff member who is registering the patient
-   * @returns {Object} - Formatted patient data
-   */
-  preparePatientData(requestData, staffId) {
-    const {
-      name,
-      email,
-      contactInfo,
-      nicNumber,
-      DOB,
-      address,
-      allergies,
-      medicalHistory,
-      bloodGroup,
-      emergencyContact,
-      gender
-    } = requestData;
-
-    return {
-      name: name.trim(),
-      email: email.toLowerCase().trim(),
-      password: this.generateTemporaryPassword(),
-      role: 'patient',
-      contactInfo: contactInfo.trim(),
-      nicNumber: nicNumber || `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      DOB: new Date(DOB),
-      address: address.trim(),
-      allergies: allergies || 'None',
-      medicalHistory: medicalHistory || 'No significant medical history',
-      bloodGroup: bloodGroup || 'Unknown',
-      emergencyContact: emergencyContact || contactInfo,
-      gender: gender || 'Not specified',
-      isSelfRegistered: false,
-      createdBy: staffId,
-      isActive: true
-    };
-  }
-
-  /**
-   * Generate temporary password for patient
-   * @returns {String} - Temporary password
-   */
-  generateTemporaryPassword() {
-    // Generate a secure temporary password
-    const length = 10;
-    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%';
-    let password = '';
-    for (let i = 0; i < length; i++) {
-      password += charset.charAt(Math.floor(Math.random() * charset.length));
-    }
-    return password;
-  }
-
-  /**
    * Register new patient (Main workflow)
    * @param {Object} patientData - Patient information
    * @param {String} staffId - Staff member ID
@@ -152,7 +57,7 @@ class PatientRegistrationService {
   async registerPatient(patientData, staffId) {
     try {
       // Step 1: Validate data
-      const validation = this.validatePatientData(patientData);
+      const validation = PatientValidator.validate(patientData);
       if (!validation.valid) {
         return {
           success: false,
@@ -177,25 +82,31 @@ class PatientRegistrationService {
         };
       }
 
-      // Step 3: Prepare and create patient
-      const preparedData = this.preparePatientData(patientData, staffId);
-      const patient = await User.create(preparedData);
+      // Step 3: Prepare patient data
+      const temporaryPassword = PasswordUtils.generateTemporaryPassword();
+      const preparedData = PatientValidator.prepareData(
+        patientData, 
+        staffId, 
+        temporaryPassword
+      );
 
-      // Step 4: Create digital health card
+      // Step 4: Create patient
+      const patient = await this.patientRepo.create(preparedData);
+
+      // Step 5: Create digital health card
       const healthCard = await this.createDigitalHealthCard(patient._id, staffId);
 
-      // Step 5: Generate QR code and barcode
-      const codes = await QRCodeService.generateHealthCardCodes(patient, healthCard);
+      // Step 6: Generate QR code and barcode
+      const codes = await this.qrService.generateHealthCardCodes(patient, healthCard);
       
-      // Update health card with QR code and barcode
+      // Step 7: Update health card with codes
       healthCard.QRCode = codes.qrCode;
       healthCard.barcode = codes.barcode;
       healthCard.barcodeImage = codes.barcodeImage;
       healthCard.qrData = codes.qrData;
       await healthCard.save();
 
-      // Step 6: Send notifications (with complete health card data including QR code)
-      // Convert to plain object to ensure all fields are included
+      // Step 8: Send notifications asynchronously
       const healthCardData = {
         cardID: healthCard.cardID,
         QRCode: healthCard.QRCode,
@@ -206,9 +117,15 @@ class PatientRegistrationService {
         isActive: healthCard.isActive
       };
 
+      console.log('📧 Preparing to send notification...');
+      console.log('   QR Code exists:', !!healthCardData.QRCode);
+      console.log('   QR Code starts with:', healthCardData.QRCode ? healthCardData.QRCode.substring(0, 30) : 'NULL');
+      console.log('   Barcode Image exists:', !!healthCardData.barcodeImage);
+      console.log('   Barcode Image starts with:', healthCardData.barcodeImage ? healthCardData.barcodeImage.substring(0, 30) : 'NULL');
+
       this.sendNotificationsAsync(patient, healthCardData);
 
-      // Step 7: Return success response
+      // Step 9: Return success response
       return {
         success: true,
         message: 'Patient registered successfully',
@@ -221,7 +138,7 @@ class PatientRegistrationService {
             issuedDate: healthCard.issuedDate,
             expiryDate: healthCard.expiryDate
           },
-          temporaryPassword: preparedData.password // Send this to staff, not to patient
+          temporaryPassword: preparedData.password
         }
       };
     } catch (error) {
@@ -241,13 +158,12 @@ class PatientRegistrationService {
    * @returns {Promise<Object>} - Created health card
    */
   async createDigitalHealthCard(patientId, staffId) {
-    const healthCard = await DigitalHealthCard.create({
+    return await this.healthCardRepo.create({
       patientID: patientId,
-      QRCode: 'PENDING', // Will be updated later
+      QRCode: 'PENDING',
       issuedBy: staffId,
       isActive: true
     });
-    return healthCard;
   }
 
   /**
@@ -264,7 +180,10 @@ class PatientRegistrationService {
       console.log('   QR Code included:', healthCard.QRCode ? 'Yes ✓' : 'No ✗');
       console.log('   Barcode included:', healthCard.barcode ? 'Yes ✓' : 'No ✗');
       
-      const result = await NotificationService.sendPatientRegistrationNotifications(patient, healthCard);
+      const result = await this.notificationService.sendPatientRegistrationNotifications(
+        patient, 
+        healthCard
+      );
       
       if (result.email.success) {
         console.log('✅ Email notification sent successfully');
@@ -273,7 +192,6 @@ class PatientRegistrationService {
       }
     } catch (error) {
       console.error('❌ Notification sending failed:', error);
-      // Don't throw error - notifications are non-critical
     }
   }
 
@@ -284,9 +202,7 @@ class PatientRegistrationService {
    */
   async getPatientHealthCard(patientId) {
     try {
-      const healthCard = await DigitalHealthCard.findOne({ patientID: patientId })
-        .populate('patientID', 'name email DOB contactInfo allergies bloodGroup')
-        .populate('issuedBy', 'name role department');
+      const healthCard = await this.healthCardRepo.findByPatientId(patientId);
 
       if (!healthCard) {
         return {
@@ -309,4 +225,10 @@ class PatientRegistrationService {
   }
 }
 
-module.exports = new PatientRegistrationService();
+// Dependency Injection
+module.exports = new PatientRegistrationService(
+  PatientRepository,
+  HealthCardRepository,
+  QRCodeService,
+  NotificationService
+);
