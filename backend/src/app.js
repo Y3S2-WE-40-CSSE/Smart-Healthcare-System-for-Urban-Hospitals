@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 
 // Route imports
 const authRoutes = require('./routes/authRoutes');
+const appointmentRoutes = require('./routes/appointmentRoutes');
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/appointments', appointmentRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
