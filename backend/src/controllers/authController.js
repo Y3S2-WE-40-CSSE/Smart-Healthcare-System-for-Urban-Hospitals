@@ -1,112 +1,124 @@
 const User = require('../models/userModel');
 const DigitalHealthCard = require('../models/digitalHealthCardModel');
 const generateToken = require('../utils/generateToken');
-const { validationResult } = require('express-validator');
+const ValidationService = require('../services/validationService');
+const ErrorHandlerService = require('../services/errorHandlerService');
+const UserRegistrationService = require('../services/userRegistrationService');
 
-// @desc    Register user (Patient/Staff only)
+// @desc    Register user (Patient/Staff/Doctor/Admin)
 // @route   POST /api/auth/register
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
+    // Validate request
+    const validation = ValidationService.validateRequest(req);
+    if (validation.hasErrors) {
+      const errorResponse = ValidationService.createValidationErrorResponse(validation.errors);
+      return res.status(400).json(errorResponse);
+    }
+
+    // Validate role
+    const roleValidation = UserRegistrationService.validatePublicRole(req.body.role);
+    if (!roleValidation.valid) {
       return res.status(400).json({
         success: false,
-        message: 'Validation errors',
-        errors: errors.array()
+        message: roleValidation.message,
+        errors: [{
+          field: 'role',
+          message: roleValidation.message
+        }],
+        errorsByField: {
+          role: roleValidation.message
+        }
       });
     }
 
-    const { 
-      name, 
-      email, 
-      password, 
-      role, 
-      contactInfo,
-      nicNumber, // Add this
-      department,
-      DOB,
-      address,
-      allergies,
-      medicalHistory
-    } = req.body;
+    // Validate role-specific fields
+    const fieldValidation = UserRegistrationService.validateRoleSpecificFields(
+      req.body.role || 'patient',
+      req.body
+    );
+
+    if (!fieldValidation.valid) {
+      const errorsByField = fieldValidation.errors.reduce((acc, err) => {
+        acc[err.field] = err.message;
+        return acc;
+      }, {});
+
+      return res.status(400).json({
+        success: false,
+        message: 'Missing required fields',
+        errors: fieldValidation.errors,
+        errorsByField: errorsByField
+      });
+    }
 
     // Check if user exists
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    const userExists = await UserRegistrationService.checkUserExists(
+      req.body.email,
+      req.body.nicNumber
+    );
+
+    if (userExists.exists) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: userExists.message,
+        errors: [{
+          field: userExists.field,
+          message: userExists.message
+        }],
+        errorsByField: {
+          [userExists.field]: userExists.message
+        }
       });
     }
 
-    // Check if NIC number exists (if provided)
-    if (nicNumber) {
-      const existingNIC = await User.findOne({ nicNumber });
-      if (existingNIC) {
+    // Check if license number exists (for doctors)
+    if (req.body.role === 'doctor') {
+      const licenseExists = await UserRegistrationService.checkLicenseExists(
+        req.body.licenseNumber
+      );
+
+      if (licenseExists.exists) {
         return res.status(400).json({
           success: false,
-          message: 'User with this NIC number already exists'
+          message: licenseExists.message,
+          errors: [{
+            field: licenseExists.field,
+            message: licenseExists.message
+          }],
+          errorsByField: {
+            [licenseExists.field]: licenseExists.message
+          }
         });
       }
     }
 
-    // Only allow patient and staff registration through this endpoint
-    if (role && !['patient', 'staff'].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid role for public registration. Only patients and staff can register.'
-      });
-    }
-
-    // Create user data object
-    const userData = {
-      name,
-      email,
-      password,
-      role: role || 'patient',
-      contactInfo,
-      nicNumber: nicNumber || `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}` // Ensure unique value
-    };
-
-    // Add role-specific fields
-    if (userData.role === 'patient') {
-      userData.DOB = DOB;
-      userData.address = address;
-      userData.allergies = allergies || 'None';
-      userData.medicalHistory = medicalHistory || 'No significant medical history';
-    } else if (userData.role === 'staff') {
-      userData.department = department;
-    }
-
-    // Create user
-    const user = await User.create(userData);
+    // Prepare and create user
+    const userData = UserRegistrationService.prepareUserData(req.body);
+    const user = await UserRegistrationService.createUser(userData);
 
     // Create digital health card for patients
     if (user.role === 'patient') {
-      const healthCard = await DigitalHealthCard.create({
-        patientID: user._id,
-        QRCode: `QR_${user._id}_${Date.now()}`,
-        issuedBy: user._id
-      });
+      await UserRegistrationService.createHealthCard(user._id);
     }
 
+    // Generate token
     const token = generateToken(user._id);
 
-    res.status(201).json({
-      success: true,
-      message: 'User registered successfully',
-      data: {
+    // Send success response
+    const response = ErrorHandlerService.createSuccessResponse(
+      'User registered successfully',
+      {
         user: user.getPublicProfile(),
         token
       }
-    });
+    );
+
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Registration error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during registration'
-    });
+    const errorResponse = ErrorHandlerService.handleError(error, 'Registration');
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -115,13 +127,11 @@ const registerUser = async (req, res) => {
 // @access  Public
 const loginUser = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    // Validate request
+    const validation = ValidationService.validateRequest(req);
+    if (validation.hasErrors) {
+      const errorResponse = ValidationService.createValidationErrorResponse(validation.errors);
+      return res.status(400).json(errorResponse);
     }
 
     const { email, password } = req.body;
@@ -131,7 +141,14 @@ const loginUser = async (req, res) => {
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials',
+        errors: [{
+          field: 'email',
+          message: 'Invalid email or password'
+        }],
+        errorsByField: {
+          email: 'Invalid email or password'
+        }
       });
     }
 
@@ -139,7 +156,11 @@ const loginUser = async (req, res) => {
     if (!user.isActive) {
       return res.status(401).json({
         success: false,
-        message: 'Account has been deactivated. Please contact administrator.'
+        message: 'Account has been deactivated. Please contact administrator.',
+        errors: [{
+          field: 'general',
+          message: 'Account has been deactivated'
+        }]
       });
     }
 
@@ -148,26 +169,31 @@ const loginUser = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid credentials',
+        errors: [{
+          field: 'password',
+          message: 'Invalid email or password'
+        }],
+        errorsByField: {
+          password: 'Invalid email or password'
+        }
       });
     }
 
     const token = generateToken(user._id);
 
-    res.status(200).json({
-      success: true,
-      message: 'Login successful',
-      data: {
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Login successful',
+      {
         user: user.getPublicProfile(),
         token
       }
-    });
+    );
+
+    res.status(200).json(response);
   } catch (error) {
-    console.error('Login error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during login'
-    });
+    const errorResponse = ErrorHandlerService.handleError(error, 'Login');
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -178,18 +204,17 @@ const getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
     
-    res.status(200).json({
-      success: true,
-      data: {
+    const response = ErrorHandlerService.createSuccessResponse(
+      'User retrieved successfully',
+      {
         user: user.getPublicProfile()
       }
-    });
+    );
+
+    res.status(200).json(response);
   } catch (error) {
-    console.error('Get user error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    const errorResponse = ErrorHandlerService.handleError(error, 'Get user');
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -198,13 +223,11 @@ const getMe = async (req, res) => {
 // @access  Private (Admin only)
 const createDoctor = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    // Validate request
+    const validation = ValidationService.validateRequest(req);
+    if (validation.hasErrors) {
+      const errorResponse = ValidationService.createValidationErrorResponse(validation.errors);
+      return res.status(400).json(errorResponse);
     }
 
     const { 
@@ -222,7 +245,14 @@ const createDoctor = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: 'User already exists with this email',
+        errors: [{
+          field: 'email',
+          message: 'User already exists with this email'
+        }],
+        errorsByField: {
+          email: 'User already exists with this email'
+        }
       });
     }
 
@@ -231,7 +261,14 @@ const createDoctor = async (req, res) => {
     if (existingLicense) {
       return res.status(400).json({
         success: false,
-        message: 'Doctor with this license number already exists'
+        message: 'Doctor with this license number already exists',
+        errors: [{
+          field: 'licenseNumber',
+          message: 'Doctor with this license number already exists'
+        }],
+        errorsByField: {
+          licenseNumber: 'Doctor with this license number already exists'
+        }
       });
     }
 
@@ -245,22 +282,21 @@ const createDoctor = async (req, res) => {
       department,
       specialization,
       licenseNumber,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      isSelfRegistered: false  // Mark as admin-created
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Doctor created successfully',
-      data: {
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Doctor created successfully',
+      {
         doctor: doctor.getPublicProfile()
       }
-    });
+    );
+
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Create doctor error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during doctor creation'
-    });
+    const errorResponse = ErrorHandlerService.handleError(error, 'Create doctor');
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -269,13 +305,11 @@ const createDoctor = async (req, res) => {
 // @access  Private (Administrator only)
 const createAdmin = async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({
-        success: false,
-        message: 'Validation errors',
-        errors: errors.array()
-      });
+    // Validate request
+    const validation = ValidationService.validateRequest(req);
+    if (validation.hasErrors) {
+      const errorResponse = ValidationService.createValidationErrorResponse(validation.errors);
+      return res.status(400).json(errorResponse);
     }
 
     const { 
@@ -291,7 +325,14 @@ const createAdmin = async (req, res) => {
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User already exists with this email'
+        message: 'User already exists with this email',
+        errors: [{
+          field: 'email',
+          message: 'User already exists with this email'
+        }],
+        errorsByField: {
+          email: 'User already exists with this email'
+        }
       });
     }
 
@@ -303,22 +344,21 @@ const createAdmin = async (req, res) => {
       role: 'admin',
       contactInfo,
       department,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      isSelfRegistered: false  // Mark as admin-created
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Administrator created successfully',
-      data: {
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Administrator created successfully',
+      {
         admin: admin.getPublicProfile()
       }
-    });
+    );
+
+    res.status(201).json(response);
   } catch (error) {
-    console.error('Create admin error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error during admin creation'
-    });
+    const errorResponse = ErrorHandlerService.handleError(error, 'Create admin');
+    res.status(500).json(errorResponse);
   }
 };
 

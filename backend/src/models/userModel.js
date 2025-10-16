@@ -81,11 +81,16 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  isSelfRegistered: {
+    type: Boolean,
+    default: false
+  },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: function() {
-      return ['doctor', 'admin'].includes(this.role);
+      // Only required if NOT self-registered
+      return ['doctor', 'admin'].includes(this.role) && !this.isSelfRegistered;
     }
   },
   createdAt: {
