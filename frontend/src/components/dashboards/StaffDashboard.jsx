@@ -1,8 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import PatientRegistrationForm from '../PatientRegistrationForm';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
+  const [showPatientForm, setShowPatientForm] = useState(false);
+
+  const handleRegistrationSuccess = (patientData) => {
+    alert(`Patient registered successfully!\nPatient ID: ${patientData.patient._id}`);
+    setShowPatientForm(false);
+  };
+
+  // If form is shown, display it
+  if (showPatientForm) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-2xl font-bold text-gray-900">Patient Registration</h2>
+          <button
+            onClick={() => setShowPatientForm(false)}
+            className="text-gray-600 hover:text-gray-900"
+          >
+            ← Back to Dashboard
+          </button>
+        </div>
+        <PatientRegistrationForm
+          onSuccess={handleRegistrationSuccess}
+          onCancel={() => setShowPatientForm(false)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -12,6 +40,25 @@ const StaffDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* NEW PATIENT REGISTRATION CARD */}
+        <div className="card hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
+          <div className="flex items-center mb-4">
+            <div className="bg-blue-600 p-3 rounded-full">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">New Patient Registration</h3>
+          </div>
+          <p className="text-gray-700 mb-4 font-medium">Register a new patient and issue digital health card</p>
+          <button 
+            onClick={() => setShowPatientForm(true)}
+            className="bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 w-full font-semibold transition-colors"
+          >
+            + Register New Patient
+          </button>
+        </div>
+
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-blue-100 p-3 rounded-full">
