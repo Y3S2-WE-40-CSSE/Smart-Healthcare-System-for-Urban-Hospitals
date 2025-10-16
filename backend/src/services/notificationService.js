@@ -24,7 +24,7 @@ class NotificationService {
     // Only create transporter if email credentials are configured
     if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
       try {
-        this.emailTransporter = nodemailer.createTransporter({
+        this.emailTransporter = nodemailer.createTransport({
           service: process.env.EMAIL_SERVICE || 'gmail',
           auth: {
             user: process.env.EMAIL_USER,
