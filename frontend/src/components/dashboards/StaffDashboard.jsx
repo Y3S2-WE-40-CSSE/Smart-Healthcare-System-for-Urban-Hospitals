@@ -1,15 +1,31 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import PatientRegistrationForm from '../PatientRegistrationForm';
+import PatientManagement from '../PatientManagement';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
   const [showPatientForm, setShowPatientForm] = useState(false);
+  const [showPatientManagement, setShowPatientManagement] = useState(false);
+  const [lastRegistration, setLastRegistration] = useState(null); // Add this state
 
   const handleRegistrationSuccess = (patientData) => {
-    alert(`Patient registered successfully!\nPatient ID: ${patientData.patient._id}`);
+    // Store the last registration for reference
+    setLastRegistration({
+      patient: patientData.patient,
+      timestamp: new Date()
+    });
+    
+    // Show confirmation and close the form
     setShowPatientForm(false);
   };
+
+  // If patient management is shown, display it
+  if (showPatientManagement) {
+    return (
+      <PatientManagement onBack={() => setShowPatientManagement(false)} />
+    );
+  }
 
   // If form is shown, display it
   if (showPatientForm) {
@@ -39,6 +55,37 @@ const StaffDashboard = () => {
         <p className="opacity-90">Hospital Staff Dashboard - {user?.department}</p>
       </div>
 
+      {/* SHOW LAST REGISTRATION NOTIFICATION */}
+      {lastRegistration && (
+        <div className="bg-green-50 border-2 border-green-500 rounded-lg p-4 relative">
+          <button
+            onClick={() => setLastRegistration(null)}
+            className="absolute top-2 right-2 text-green-700 hover:text-green-900"
+          >
+            ✕
+          </button>
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-green-800">
+                Patient Successfully Registered!
+              </h3>
+              <div className="mt-2 text-sm text-green-700">
+                <p><strong>Patient:</strong> {lastRegistration.patient.name}</p>
+                <p><strong>ID:</strong> {lastRegistration.patient._id}</p>
+                <p className="text-xs mt-1 text-green-600">
+                  Registered at {lastRegistration.timestamp.toLocaleTimeString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* NEW PATIENT REGISTRATION CARD */}
         <div className="card hover:shadow-lg transition-shadow duration-200 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-200">
@@ -59,6 +106,7 @@ const StaffDashboard = () => {
           </button>
         </div>
 
+        {/* PATIENT MANAGEMENT CARD - UPDATED */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-blue-100 p-3 rounded-full">
@@ -68,8 +116,13 @@ const StaffDashboard = () => {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 ml-3">Patient Management</h3>
           </div>
-          <p className="text-gray-600 mb-4">Manage patient registrations and information</p>
-          <button className="btn-primary w-full">Manage Patients</button>
+          <p className="text-gray-600 mb-4">View, edit, and manage patient records</p>
+          <button 
+            onClick={() => setShowPatientManagement(true)}
+            className="btn-primary w-full"
+          >
+            Manage Patients
+          </button>
         </div>
 
         <div className="card hover:shadow-lg transition-shadow duration-200">

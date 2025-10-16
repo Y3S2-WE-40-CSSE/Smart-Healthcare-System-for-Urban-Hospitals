@@ -44,4 +44,14 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
 };
 
+// Patient API calls
+export const patientAPI = {
+  register: (patientData) => api.post('/patients/register', patientData),
+  getAllPatients: () => api.get('/patients'),
+  getPatient: (patientId) => api.get(`/patients/${patientId}`),
+  updatePatient: (patientId, patientData) => api.put(`/patients/${patientId}`, patientData),
+  deletePatient: (patientId) => api.delete(`/patients/${patientId}`),
+  getHealthCard: (patientId) => api.get(`/patients/${patientId}/health-card`),
+};
+
 export default api;

@@ -22,6 +22,10 @@ const digitalHealthCardSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  barcodeImage: {
+    type: String,
+    default: ''
+  },
   qrData: {
     type: Object,
     default: {}

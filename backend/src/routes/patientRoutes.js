@@ -1,6 +1,12 @@
 const express = require('express');
 const { body } = require('express-validator');
-const { registerPatient, getHealthCard } = require('../controllers/patientController');
+const { 
+  registerPatient, 
+  getHealthCard, 
+  getAllPatients, 
+  updatePatient, 
+  deletePatient 
+} = require('../controllers/patientController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -30,12 +36,36 @@ router.post(
   registerPatient
 );
 
+// Get all patients
+router.get(
+  '/',
+  protect,
+  authorize('staff', 'doctor', 'admin', 'administrator'),
+  getAllPatients
+);
+
 // Get patient health card
 router.get(
   '/:patientId/health-card',
   protect,
   authorize('staff', 'doctor', 'admin', 'administrator', 'patient'),
   getHealthCard
+);
+
+// Update patient
+router.put(
+  '/:patientId',
+  protect,
+  authorize('staff', 'doctor', 'admin', 'administrator'),
+  updatePatient
+);
+
+// Delete patient
+router.delete(
+  '/:patientId',
+  protect,
+  authorize('staff', 'admin', 'administrator'),
+  deletePatient
 );
 
 module.exports = router;

@@ -1,4 +1,6 @@
 const QRCode = require('qrcode');
+const { createCanvas } = require('canvas');
+const JsBarcode = require('jsbarcode');
 
 /**
  * QRCodeService - Handles QR code and barcode generation
@@ -27,15 +29,40 @@ class QRCodeService {
   }
 
   /**
-   * Generate barcode (Code128)
+   * Generate barcode string
    * @param {String} data - Data to encode
    * @returns {String} - Barcode string
    */
-  generateBarcode(data) {
+  generateBarcodeString(data) {
     // Simple barcode format: prefix + timestamp + data
     const timestamp = Date.now();
     const barcode = `HC${timestamp}${data}`;
     return barcode;
+  }
+
+  /**
+   * Generate barcode image (Code128)
+   * @param {String} data - Data to encode
+   * @returns {String} - Barcode data URL
+   */
+  generateBarcodeImage(data) {
+    try {
+      const canvas = createCanvas(400, 100);
+      
+      JsBarcode(canvas, data, {
+        format: 'CODE128',
+        width: 2,
+        height: 80,
+        displayValue: true,
+        fontSize: 14,
+        margin: 10
+      });
+
+      return canvas.toDataURL('image/png');
+    } catch (error) {
+      console.error('Barcode generation failed:', error);
+      return null;
+    }
   }
 
   /**
@@ -67,14 +94,30 @@ class QRCodeService {
    * @returns {Promise<Object>} - QR code and barcode
    */
   async generateHealthCardCodes(patient, healthCard) {
+    console.log('🔧 Generating QR code and barcode for patient:', patient.name);
+    
     const qrData = this.createHealthCardQRData(patient, healthCard);
     const qrCodeResult = await this.generateQRCode(qrData);
-    const barcode = this.generateBarcode(healthCard.cardID);
+    
+    // Generate barcode string
+    const barcodeString = this.generateBarcodeString(healthCard.cardID);
+    
+    // Generate barcode image
+    const barcodeImage = this.generateBarcodeImage(barcodeString);
+
+    if (qrCodeResult.success) {
+      console.log('✅ QR code generated successfully');
+      console.log('✅ Barcode generated:', barcodeString);
+      console.log('✅ Barcode image generated:', barcodeImage ? 'Yes' : 'No');
+    } else {
+      console.error('❌ QR code generation failed:', qrCodeResult.error);
+    }
 
     return {
       qrCode: qrCodeResult.success ? qrCodeResult.qrCode : null,
       qrData: qrData,
-      barcode: barcode,
+      barcode: barcodeString,
+      barcodeImage: barcodeImage, // New field
       success: qrCodeResult.success
     };
   }

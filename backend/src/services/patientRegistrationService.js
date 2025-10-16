@@ -190,11 +190,23 @@ class PatientRegistrationService {
       // Update health card with QR code and barcode
       healthCard.QRCode = codes.qrCode;
       healthCard.barcode = codes.barcode;
+      healthCard.barcodeImage = codes.barcodeImage;
       healthCard.qrData = codes.qrData;
       await healthCard.save();
 
-      // Step 6: Send notifications (async, don't wait)
-      this.sendNotificationsAsync(patient, healthCard);
+      // Step 6: Send notifications (with complete health card data including QR code)
+      // Convert to plain object to ensure all fields are included
+      const healthCardData = {
+        cardID: healthCard.cardID,
+        QRCode: healthCard.QRCode,
+        barcode: healthCard.barcode,
+        barcodeImage: healthCard.barcodeImage,
+        issuedDate: healthCard.issuedDate,
+        expiryDate: healthCard.expiryDate,
+        isActive: healthCard.isActive
+      };
+
+      this.sendNotificationsAsync(patient, healthCardData);
 
       // Step 7: Return success response
       return {
@@ -245,9 +257,22 @@ class PatientRegistrationService {
    */
   async sendNotificationsAsync(patient, healthCard) {
     try {
-      await NotificationService.sendPatientRegistrationNotifications(patient, healthCard);
+      console.log('📧 Sending registration notifications...');
+      console.log('   Patient:', patient.name);
+      console.log('   Email:', patient.email);
+      console.log('   Health Card ID:', healthCard.cardID);
+      console.log('   QR Code included:', healthCard.QRCode ? 'Yes ✓' : 'No ✗');
+      console.log('   Barcode included:', healthCard.barcode ? 'Yes ✓' : 'No ✗');
+      
+      const result = await NotificationService.sendPatientRegistrationNotifications(patient, healthCard);
+      
+      if (result.email.success) {
+        console.log('✅ Email notification sent successfully');
+      } else {
+        console.log('⚠️ Email notification failed:', result.email.error || result.email.message);
+      }
     } catch (error) {
-      console.error('Notification sending failed:', error);
+      console.error('❌ Notification sending failed:', error);
       // Don't throw error - notifications are non-critical
     }
   }
