@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { extractValidationErrors, formatErrorMessage, validateFormData } from '../utils/errorHandler';
 
 const SignupForm = () => {
   const [formData, setFormData] = useState({
@@ -28,6 +29,15 @@ const SignupForm = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -35,27 +45,56 @@ const SignupForm = () => {
     setErrors({});
     setLoading(true);
 
-    // Basic validation
+    // Client-side validation
+    const validation = validateFormData(formData, 'register');
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      setLoading(false);
+      return;
+    }
+
+    // Password confirmation check
     if (formData.password !== formData.confirmPassword) {
       setErrors({ confirmPassword: 'Passwords do not match' });
       setLoading(false);
       return;
     }
 
-    const result = await register(formData);
+    // Prepare data for backend
+    const submitData = { ...formData };
+    delete submitData.confirmPassword;
+
+    // Remove fields not needed for the role
+    if (submitData.role !== 'patient') {
+      delete submitData.DOB;
+      delete submitData.address;
+      delete submitData.allergies;
+      delete submitData.medicalHistory;
+    }
+
+    if (submitData.role !== 'staff') {
+      delete submitData.department;
+    }
+
+    // Set default values for optional fields
+    if (!submitData.allergies) submitData.allergies = 'None';
+    if (!submitData.medicalHistory) submitData.medicalHistory = 'No significant medical history';
+
+    // Register user
+    const result = await register(submitData);
     
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setErrors({ general: result.message });
-      if (result.errors) {
-        const fieldErrors = {};
-        result.errors.forEach(error => {
-          fieldErrors[error.path] = error.msg;
-        });
-        setErrors(prev => ({ ...prev, ...fieldErrors }));
-      }
+      const fieldErrors = extractValidationErrors(result);
+      const generalMessage = formatErrorMessage(result);
+      
+      setErrors({
+        general: generalMessage,
+        ...fieldErrors
+      });
     }
+    
     setLoading(false);
   };
 

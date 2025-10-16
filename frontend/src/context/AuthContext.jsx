@@ -106,18 +106,26 @@ export const AuthProvider = ({ children }) => {
   // Register user
   const register = async (userData) => {
     try {
+      console.log('📤 Sending registration data:', userData); // DEBUG LOG
       const response = await authAPI.register(userData);
+      console.log('✅ Registration success:', response.data); // DEBUG LOG
+      
       dispatch({
         type: 'REGISTER_SUCCESS',
         payload: response.data.data,
       });
       return { success: true };
     } catch (error) {
+      console.error('❌ Registration error:', error.response?.data); // DEBUG LOG
+      
       dispatch({ type: 'AUTH_ERROR' });
+      
+      // ⭐ RETURN COMPLETE ERROR OBJECT INCLUDING errorsByField
       return {
         success: false,
         message: error.response?.data?.message || 'Registration failed',
-        errors: error.response?.data?.errors,
+        errors: error.response?.data?.errors || [],
+        errorsByField: error.response?.data?.errorsByField || {} // ADD THIS LINE
       };
     }
   };

@@ -1,30 +1,33 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
+import { extractValidationErrors, formatErrorMessage, validateFormData } from '../utils/errorHandler';
+import { useRoleConfig } from '../hooks/useRoleConfig';
 
 const RegisterForm = () => {
   const [formData, setFormData] = useState({
-  name: '',
-  email: '',
-  password: '',
-  confirmPassword: '',
-  role: 'patient',
-  contactInfo: '',
-  nicNumber: '', // Add this line
-  department: '',
-  specialization: '',
-  licenseNumber: '',
-  DOB: '',
-  address: '',
-  allergies: '',
-  medicalHistory: ''
-});
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    role: 'patient',
+    contactInfo: '',
+    nicNumber: '',
+    department: '',
+    specialization: '',
+    licenseNumber: '',
+    DOB: '',
+    address: '',
+    allergies: '',
+    medicalHistory: ''
+  });
 
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
 
   const { register } = useAuth();
   const navigate = useNavigate();
+  const { roleOptions, shouldShowField, isFieldRequired } = useRoleConfig();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -32,6 +35,15 @@ const RegisterForm = () => {
       ...prev,
       [name]: value
     }));
+    
+    // Clear error for this field when user starts typing
+    if (errors[name]) {
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -39,52 +51,83 @@ const RegisterForm = () => {
     setErrors({});
     setLoading(true);
 
-    // Basic validation
+    // Client-side validation
+    const validation = validateFormData(formData, 'register');
+    if (!validation.isValid) {
+      setErrors(validation.errors);
+      setLoading(false);
+      return;
+    }
+
+    // Password confirmation check
     if (formData.password !== formData.confirmPassword) {
       setErrors({ confirmPassword: 'Passwords do not match' });
       setLoading(false);
       return;
     }
 
-    // Prepare data for backend - remove confirmPassword and handle optional fields
+    // Prepare data for backend
     const submitData = { ...formData };
     delete submitData.confirmPassword;
 
-    // Remove licenseNumber for non-doctor roles to avoid unique constraint issues
+    // Remove fields not needed for the role
     if (submitData.role !== 'doctor') {
       delete submitData.licenseNumber;
       delete submitData.specialization;
     }
 
-    // Remove department for non-staff/doctor/admin roles
     if (!['staff', 'doctor', 'admin'].includes(submitData.role)) {
       delete submitData.department;
     }
 
-    // Remove patient-specific fields for non-patient roles
     if (submitData.role !== 'patient') {
       delete submitData.DOB;
       delete submitData.address;
+      delete submitData.allergies;
+      delete submitData.medicalHistory;
     }
 
     // Set default values for optional fields
-    if (!submitData.allergies) submitData.allergies = 'None';
-    if (!submitData.medicalHistory) submitData.medicalHistory = 'No significant medical history';
+    if (submitData.role === 'patient') {
+      if (!submitData.allergies) submitData.allergies = 'None';
+      if (!submitData.medicalHistory) submitData.medicalHistory = 'No significant medical history';
+    }
 
+    // Register user
     const result = await register(submitData);
-    
+
+    console.log('📥 Registration result:', result); // DEBUG LOG
+
     if (result.success) {
       navigate('/dashboard');
     } else {
-      setErrors({ general: result.message });
-      if (result.errors) {
-        const fieldErrors = {};
-        result.errors.forEach(error => {
-          fieldErrors[error.path] = error.msg;
-        });
-        setErrors(prev => ({ ...prev, ...fieldErrors }));
+      // Extract field-specific errors with better logging
+      console.log('❌ Registration failed:', result);
+      
+      const fieldErrors = extractValidationErrors(result);
+      const generalMessage = formatErrorMessage(result);
+      
+      console.log('🎯 Setting errors:', {
+        general: generalMessage,
+        ...fieldErrors
+      });
+      
+      setErrors({
+        general: generalMessage,
+        ...fieldErrors
+      });
+      
+      // Scroll to first error
+      const firstErrorField = Object.keys(fieldErrors)[0];
+      if (firstErrorField) {
+        const element = document.getElementById(firstErrorField);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
       }
     }
+    
     setLoading(false);
   };
 
@@ -102,21 +145,32 @@ const RegisterForm = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {errors.general && (
             <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
-              {errors.general}
+              <p className="font-bold">⚠️ {errors.general}</p>
+              {/* Show all field errors in the alert too */}
+              {Object.keys(errors).length > 1 && (
+                <ul className="mt-2 text-sm list-disc list-inside">
+                  {Object.entries(errors).map(([field, message]) => {
+                    if (field !== 'general') {
+                      return <li key={field}><strong>{field}:</strong> {message}</li>;
+                    }
+                    return null;
+                  })}
+                </ul>
+              )}
             </div>
           )}
           
           <div className="space-y-4">
             <div>
               <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Full Name
+                Full Name *
               </label>
               <input
                 id="name"
                 name="name"
                 type="text"
                 required
-                className="input-field"
+                className={`input-field ${errors.name ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                 placeholder="Enter your full name"
                 value={formData.name}
                 onChange={handleChange}
@@ -126,14 +180,14 @@ const RegisterForm = () => {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email Address
+                Email Address *
               </label>
               <input
                 id="email"
                 name="email"
                 type="email"
                 required
-                className="input-field"
+                className={`input-field ${errors.email ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                 placeholder="Enter your email"
                 value={formData.email}
                 onChange={handleChange}
@@ -143,15 +197,15 @@ const RegisterForm = () => {
 
             <div>
               <label htmlFor="nicNumber" className="block text-sm font-medium text-gray-700">
-                NIC Number
+                NIC Number {isFieldRequired('nicNumber', formData.role) && '*'}
               </label>
               <input
                 id="nicNumber"
                 name="nicNumber"
                 type="text"
-                required
-                className="input-field"
-                placeholder="Enter your NIC number"
+                required={isFieldRequired('nicNumber', formData.role)}
+                className={`input-field ${errors.nicNumber ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
+                placeholder="Enter your NIC number (optional)"
                 value={formData.nicNumber}
                 onChange={handleChange}
               />
@@ -160,33 +214,35 @@ const RegisterForm = () => {
 
             <div>
               <label htmlFor="role" className="block text-sm font-medium text-gray-700">
-                Role
+                Role *
               </label>
               <select
                 id="role"
                 name="role"
-                className="input-field"
+                className={`input-field ${errors.role ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                 value={formData.role}
                 onChange={handleChange}
               >
-                <option value="patient">Patient</option>
-                <option value="staff">Staff</option>
-                <option value="doctor">Doctor</option>
-                <option value="admin">Admin</option>
+                {roleOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
+              {errors.role && <p className="text-red-500 text-sm mt-1">{errors.role}</p>}
             </div>
 
             <div>
               <label htmlFor="contactInfo" className="block text-sm font-medium text-gray-700">
-                Contact Information
+                Contact Information *
               </label>
               <input
                 id="contactInfo"
                 name="contactInfo"
                 type="text"
                 required
-                className="input-field"
-                placeholder="Enter your contact information"
+                className={`input-field ${errors.contactInfo ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
+                placeholder="Enter your phone number"
                 value={formData.contactInfo}
                 onChange={handleChange}
               />
@@ -194,18 +250,18 @@ const RegisterForm = () => {
             </div>
 
             {/* Patient-specific fields */}
-            {formData.role === 'patient' && (
+            {shouldShowField('DOB', formData.role) && (
               <>
                 <div>
                   <label htmlFor="DOB" className="block text-sm font-medium text-gray-700">
-                    Date of Birth
+                    Date of Birth *
                   </label>
                   <input
                     id="DOB"
                     name="DOB"
                     type="date"
                     required
-                    className="input-field"
+                    className={`input-field ${errors.DOB ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                     value={formData.DOB}
                     onChange={handleChange}
                   />
@@ -214,14 +270,14 @@ const RegisterForm = () => {
 
                 <div>
                   <label htmlFor="address" className="block text-sm font-medium text-gray-700">
-                    Address
+                    Address *
                   </label>
                   <input
                     id="address"
                     name="address"
                     type="text"
                     required
-                    className="input-field"
+                    className={`input-field ${errors.address ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                     placeholder="Enter your address"
                     value={formData.address}
                     onChange={handleChange}
@@ -262,17 +318,17 @@ const RegisterForm = () => {
             )}
 
             {/* Staff/Doctor/Admin specific fields */}
-            {(formData.role === 'staff' || formData.role === 'doctor' || formData.role === 'admin') && (
+            {shouldShowField('department', formData.role) && (
               <div>
                 <label htmlFor="department" className="block text-sm font-medium text-gray-700">
-                  Department
+                  Department *
                 </label>
                 <input
                   id="department"
                   name="department"
                   type="text"
                   required
-                  className="input-field"
+                  className={`input-field ${errors.department ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                   placeholder="Enter your department"
                   value={formData.department}
                   onChange={handleChange}
@@ -282,36 +338,40 @@ const RegisterForm = () => {
             )}
 
             {/* Doctor-specific fields */}
-            {formData.role === 'doctor' && (
+            {shouldShowField('specialization', formData.role) && (
               <>
                 <div>
                   <label htmlFor="specialization" className="block text-sm font-medium text-gray-700">
-                    Specialization
+                    Specialization *
                   </label>
                   <input
                     id="specialization"
                     name="specialization"
                     type="text"
                     required
-                    className="input-field"
+                    className={`input-field ${errors.specialization ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                     placeholder="Enter your specialization"
                     value={formData.specialization}
                     onChange={handleChange}
                   />
-                  {errors.specialization && <p className="text-red-500 text-sm mt-1">{errors.specialization}</p>}
+                  {errors.specialization && (
+                    <p className="text-red-600 text-sm mt-1 font-semibold">
+                      ⚠️ {errors.specialization}
+                    </p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="licenseNumber" className="block text-sm font-medium text-gray-700">
-                    License Number
+                    License Number *
                   </label>
                   <input
                     id="licenseNumber"
                     name="licenseNumber"
                     type="text"
                     required
-                    className="input-field"
-                    placeholder="Enter your license number"
+                    className={`input-field ${errors.licenseNumber ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
+                    placeholder="Enter your medical license number"
                     value={formData.licenseNumber}
                     onChange={handleChange}
                   />
@@ -322,15 +382,15 @@ const RegisterForm = () => {
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
+                Password *
               </label>
               <input
                 id="password"
                 name="password"
                 type="password"
                 required
-                className="input-field"
-                placeholder="Enter your password"
+                className={`input-field ${errors.password ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
+                placeholder="Enter your password (min 6 characters)"
                 value={formData.password}
                 onChange={handleChange}
               />
@@ -339,14 +399,14 @@ const RegisterForm = () => {
 
             <div>
               <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Confirm Password
+                Confirm Password *
               </label>
               <input
                 id="confirmPassword"
                 name="confirmPassword"
                 type="password"
                 required
-                className="input-field"
+                className={`input-field ${errors.confirmPassword ? 'border-2 border-red-500 bg-red-50' : 'border border-gray-300'}`}
                 placeholder="Confirm your password"
                 value={formData.confirmPassword}
                 onChange={handleChange}
@@ -359,7 +419,7 @@ const RegisterForm = () => {
             <button
               type="submit"
               disabled={loading}
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
