@@ -1,8 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const StaffDashboard = () => {
   const { user } = useAuth();
+
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">
@@ -25,18 +28,23 @@ const StaffDashboard = () => {
           <button className="btn-primary w-full">Manage Patients</button>
         </div>
 
-        <div className="card hover:shadow-lg transition-shadow duration-200">
-          <div className="flex items-center mb-4">
-            <div className="bg-purple-100 p-3 rounded-full">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0v-4m0 0h8m-8 0V7a4 4 0 118 0v4" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Appointments</h3>
+      <div className="card hover:shadow-lg transition-shadow duration-200">
+        <div className="flex items-center mb-4">
+          <div className="bg-purple-100 p-3 rounded-full">
+            <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0v-4m0 0h8m-8 0V7a4 4 0 118 0v4" />
+            </svg>
           </div>
-          <p className="text-gray-600 mb-4">Schedule and manage patient appointments</p>
-          <button className="btn-primary w-full">Manage Appointments</button>
+          <h3 className="text-lg font-semibold text-gray-900 ml-3">Appointments</h3>
         </div>
+        <p className="text-gray-600 mb-4">View Patient appointment details</p>
+        <button 
+          onClick={() => navigate('/staff-appointments')}
+          className="btn-primary w-full"
+        >
+          View Appointment Details
+        </button>
+      </div>
 
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">

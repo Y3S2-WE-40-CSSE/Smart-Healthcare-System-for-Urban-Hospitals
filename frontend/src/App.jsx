@@ -8,6 +8,7 @@ import Dashboard from './components/Dashboard';
 import AppointmentList from './components/appointments/AppointmentList';
 import BookAppointment from './components/appointments/BookAppointment';
 import DoctorAppointments from './components/appointments/DoctorAppointments';
+import StaffAppointments from './components/appointments/StaffAppointments';
 
 function App() {
   return (
@@ -41,6 +42,15 @@ function App() {
               element={
                 <ProtectedRoute>
                   <BookAppointment />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/staff-appointments"
+              element={
+                <ProtectedRoute>
+                  <StaffAppointments />
                 </ProtectedRoute>
               }
             />
