@@ -134,14 +134,26 @@ const AppointmentList = () => {
   const getUpcomingAppointments = () => {
     const now = new Date();
     return appointments
-      .filter(apt => new Date(apt.dateTime) >= now && apt.status !== 'cancelled' && apt.status !== 'completed')
+      .filter(apt => {
+        const aptDate = new Date(apt.dateTime);
+        // Only show appointments that are in the future AND not completed/cancelled
+        return aptDate >= now && 
+              apt.status !== 'cancelled' && 
+              apt.status !== 'completed';
+      })
       .sort((a, b) => new Date(a.dateTime) - new Date(b.dateTime));
   };
 
   const getPastAppointments = () => {
     const now = new Date();
     return appointments
-      .filter(apt => new Date(apt.dateTime) < now || apt.status === 'completed' || apt.status === 'cancelled')
+      .filter(apt => {
+        const aptDate = new Date(apt.dateTime);
+        // Show appointments that are in the past OR completed/cancelled
+        return aptDate < now || 
+              apt.status === 'completed' || 
+              apt.status === 'cancelled';
+      })
       .sort((a, b) => new Date(b.dateTime) - new Date(a.dateTime));
   };
 
