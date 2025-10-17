@@ -1,8 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import PatientVisitWorkflow from '../PatientVisitWorkflow';
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
+  const [showWorkflow, setShowWorkflow] = useState(false);
+
+  // If workflow is active, show it
+  if (showWorkflow) {
+    return (
+      <div>
+        <button 
+          onClick={() => setShowWorkflow(false)}
+          className="mb-4 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+        >
+          ← Back to Dashboard
+        </button>
+        <PatientVisitWorkflow />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -12,19 +29,26 @@ const DoctorDashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="card hover:shadow-lg transition-shadow duration-200">
+        {/* START NEW PATIENT VISIT - PRIMARY ACTION */}
+        <div className="card hover:shadow-lg transition-shadow duration-200 border-2 border-blue-500">
           <div className="flex items-center mb-4">
             <div className="bg-blue-100 p-3 rounded-full">
               <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Patient Records</h3>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">Patient Visit</h3>
           </div>
-          <p className="text-gray-600 mb-4">View and update patient medical records</p>
-          <button className="btn-primary w-full">View Records</button>
+          <p className="text-gray-600 mb-4">Search patient and add visit record</p>
+          <button 
+            onClick={() => setShowWorkflow(true)}
+            className="btn-primary w-full"
+          >
+            Start Patient Visit
+          </button>
         </div>
 
+        {/* ... rest of existing cards ... */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-3 rounded-full">
