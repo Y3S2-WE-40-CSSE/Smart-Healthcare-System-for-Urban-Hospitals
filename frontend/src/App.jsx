@@ -5,21 +5,10 @@ import ProtectedRoute from './components/ProtectedRoute';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
 import Dashboard from './components/Dashboard';
-
-// Create a wrapper component for the root route
-const RootRedirect = () => {
-  const { isAuthenticated, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
-  return isAuthenticated ? <Navigate to="/dashboard" /> : <Navigate to="/login" />;
-};
+import AppointmentList from './components/appointments/AppointmentList';
+import BookAppointment from './components/appointments/BookAppointment';
+import DoctorAppointments from './components/appointments/DoctorAppointments';
+import StaffAppointments from './components/appointments/StaffAppointments';
 
 function App() {
   return (
@@ -27,8 +16,11 @@ function App() {
       <Router>
         <div className="App">
           <Routes>
+            {/* Public Routes */}
             <Route path="/login" element={<LoginForm />} />
             <Route path="/register" element={<RegisterForm />} />
+            
+            {/* Protected Routes */}
             <Route
               path="/dashboard"
               element={
@@ -37,8 +29,47 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Updated root route - checks authentication before redirecting */}
-            <Route path="/" element={<RootRedirect />} />
+            <Route
+              path="/appointments"
+              element={
+                <ProtectedRoute>
+                  <AppointmentList />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/book-appointment"
+              element={
+                <ProtectedRoute>
+                  <BookAppointment />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/staff-appointments"
+              element={
+                <ProtectedRoute>
+                  <StaffAppointments />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/doctor-appointments"
+              element={
+                <ProtectedRoute>
+                  <DoctorAppointments />
+                </ProtectedRoute>
+              }
+            />
+
+            
+            {/* Default Route */}
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+            
+            {/* Catch all route */}
+            <Route path="*" element={<Navigate to="/dashboard" />} />
           </Routes>
         </div>
       </Router>

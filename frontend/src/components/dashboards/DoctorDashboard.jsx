@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import PatientVisitWorkflow from '../PatientVisitWorkflow';
 
 const DoctorDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [showWorkflow, setShowWorkflow] = useState(false);
 
   // If workflow is active, show it
@@ -48,7 +50,26 @@ const DoctorDashboard = () => {
           </button>
         </div>
 
-        {/* ... rest of existing cards ... */}
+        {/* Consultation Card */}
+        <div className="card hover:shadow-lg transition-shadow duration-200">
+          <div className="flex items-center mb-4">
+            <div className="bg-purple-100 p-3 rounded-full">
+              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">Consultations</h3>
+          </div>
+          <p className="text-gray-600 mb-4">View and manage patient consultations</p>
+          <button 
+            onClick={() => navigate('/doctor-appointments')}
+            className="btn-primary w-full"
+          >
+            View Consultations
+          </button>
+        </div>
+
+        {/* Prescriptions Card */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-green-100 p-3 rounded-full">
@@ -62,19 +83,7 @@ const DoctorDashboard = () => {
           <button className="btn-primary w-full">Manage Prescriptions</button>
         </div>
 
-        <div className="card hover:shadow-lg transition-shadow duration-200">
-          <div className="flex items-center mb-4">
-            <div className="bg-purple-100 p-3 rounded-full">
-              <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Schedule</h3>
-          </div>
-          <p className="text-gray-600 mb-4">View your appointment schedule</p>
-          <button className="btn-primary w-full">View Schedule</button>
-        </div>
-
+        {/* Lab Results Card */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-red-100 p-3 rounded-full">
@@ -88,19 +97,7 @@ const DoctorDashboard = () => {
           <button className="btn-primary w-full">View Results</button>
         </div>
 
-        <div className="card hover:shadow-lg transition-shadow duration-200">
-          <div className="flex items-center mb-4">
-            <div className="bg-yellow-100 p-3 rounded-full">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Consultations</h3>
-          </div>
-          <p className="text-gray-600 mb-4">Manage patient consultations</p>
-          <button className="btn-primary w-full">View Consultations</button>
-        </div>
-
+        {/* Profile Card */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-indigo-100 p-3 rounded-full">
