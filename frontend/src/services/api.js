@@ -44,4 +44,30 @@ export const authAPI = {
   getMe: () => api.get('/auth/me'),
 };
 
+// Patient API calls
+export const patientAPI = {
+  register: (patientData) => api.post('/patients/register', patientData),
+  getAllPatients: () => api.get('/patients'),
+  getPatient: (patientId) => api.get(`/patients/${patientId}`),
+  updatePatient: (patientId, patientData) => api.put(`/patients/${patientId}`, patientData),
+  deletePatient: (patientId) => api.delete(`/patients/${patientId}`),
+  getHealthCard: (patientId) => api.get(`/patients/${patientId}/health-card`),
+};
+
+// ADD THIS NEW SECTION - Medical Record API calls
+export const medicalRecordAPI = {
+  // Scan health card (QR/Barcode)
+  searchByHealthCardID: (cardID) => api.post('/medical-records/scan', { cardID }),
+  
+  // Search patient by NIC (manual fallback)
+  searchPatientByNIC: (nicNumber) => api.get(`/medical-records/search/${nicNumber}`),
+  
+  // Get patient medical history
+  getMedicalHistory: (patientId) => api.get(`/medical-records/patient/${patientId}`),
+  getPatientMedicalHistory: (patientId) => api.get(`/medical-records/patient/${patientId}`),
+  
+  // Add new visit record
+  addVisitRecord: (visitData) => api.post('/medical-records', visitData),
+};
+
 export default api;

@@ -18,6 +18,18 @@ const digitalHealthCardSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  barcode: {
+    type: String,
+    default: ''
+  },
+  barcodeImage: {
+    type: String,
+    default: ''
+  },
+  qrData: {
+    type: Object,
+    default: {}
+  },
   issuedDate: {
     type: Date,
     default: Date.now
