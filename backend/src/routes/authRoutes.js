@@ -3,10 +3,14 @@ const { body } = require('express-validator');
 const { 
   registerUser, 
   loginUser, 
-  getMe, 
+  getMe
+} = require('../controllers/authController');
+
+const { 
   createDoctor, 
   createAdmin 
-} = require('../controllers/authController');
+} = require('../controllers/adminUserController');
+
 const { protect, authorize } = require('../middleware/authMiddleware');
 const RoleConfigService = require('../services/roleConfigService');
 

@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import { extractValidationErrors, formatErrorMessage } from '../utils/errorHandler';
+import { patientAPI } from '../services/api';
+import RegistrationSuccess from './RegistrationSuccess';
 
+/**
+ * PatientRegistrationForm - Handles only form display and submission
+ * Follows Single Responsibility Principle
+ */
 const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -19,13 +25,11 @@ const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(null);
-  const [copied, setCopied] = useState(false); // Add this state for copy feedback
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
     
-    // Clear error for this field
     if (errors[name]) {
       setErrors(prev => {
         const newErrors = { ...prev };
@@ -42,106 +46,43 @@ const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
     setSuccess(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/patients/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
+      const response = await patientAPI.register(formData);
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response.data.success) {
         setSuccess({
           message: 'Patient registered successfully!',
-          patientData: data.data
+          patientData: response.data.data
         });
-        
-        // REMOVED: Auto-close timeout
-        // Staff can now manually close when ready
       } else {
-        const fieldErrors = extractValidationErrors(data);
+        const fieldErrors = extractValidationErrors(response.data);
         setErrors({
-          general: formatErrorMessage(data),
+          general: formatErrorMessage(response.data),
           ...fieldErrors
         });
       }
     } catch (error) {
-      setErrors({
-        general: 'Network error. Please check your connection and try again.'
-      });
+      const errorData = error.response?.data;
+      if (errorData) {
+        const fieldErrors = extractValidationErrors(errorData);
+        setErrors({
+          general: formatErrorMessage(errorData),
+          ...fieldErrors
+        });
+      } else {
+        setErrors({
+          general: 'Network error. Please check your connection and try again.'
+        });
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Add copy to clipboard function
-  const handleCopyPassword = () => {
-    if (success?.patientData?.temporaryPassword) {
-      navigator.clipboard.writeText(success.patientData.temporaryPassword)
-        .then(() => {
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        })
-        .catch(() => {
-          alert('Failed to copy password. Please copy it manually.');
-        });
-    }
-  };
-
-  // Add print credentials function
-  const handlePrintCredentials = () => {
-    const printWindow = window.open('', '', 'width=600,height=400');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Patient Credentials - ${success.patientData.patient.name}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; }
-            .header { text-align: center; margin-bottom: 30px; }
-            .info { margin: 10px 0; }
-            .password { font-size: 18px; font-weight: bold; background: #ffffcc; padding: 10px; border: 2px dashed #333; }
-            .warning { color: red; margin-top: 20px; font-weight: bold; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h2>Smart Healthcare System</h2>
-            <h3>Patient Registration Credentials</h3>
-          </div>
-          <div class="info"><strong>Patient Name:</strong> ${success.patientData.patient.name}</div>
-          <div class="info"><strong>Patient ID:</strong> ${success.patientData.patient._id}</div>
-          <div class="info"><strong>Health Card ID:</strong> ${success.patientData.healthCard.cardID}</div>
-          <div class="info"><strong>Email:</strong> ${success.patientData.patient.email}</div>
-          <br/>
-          <div class="password">
-            <strong>Temporary Password:</strong> ${success.patientData.temporaryPassword}
-          </div>
-          <div class="warning">
-            ⚠️ IMPORTANT: This is a temporary password. The patient must change it upon first login.
-          </div>
-          <div style="margin-top: 30px; font-size: 12px; color: #666;">
-            <p>Generated on: ${new Date().toLocaleString()}</p>
-            <p>Generated by: Staff Member</p>
-          </div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
-  };
-
-  // Add manual close function
   const handleClose = () => {
     if (onSuccess) {
       onSuccess(success.patientData);
     }
     setSuccess(null);
-    // Reset form
     setFormData({
       name: '',
       email: '',
@@ -157,102 +98,13 @@ const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
     });
   };
 
+  // Show success component if registration successful
   if (success) {
     return (
-      <div className="bg-white rounded-lg shadow-lg p-8">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-            <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-            </svg>
-          </div>
-          <h3 className="text-2xl font-bold text-gray-900 mb-2">{success.message}</h3>
-          
-          <div className="mt-6 bg-blue-50 p-6 rounded-lg border-2 border-blue-200">
-            <h4 className="font-semibold text-blue-900 mb-4 text-lg">Patient Information</h4>
-            <div className="text-left space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <p className="text-gray-600"><strong>Patient Name:</strong></p>
-                <p className="text-gray-900">{success.patientData.patient.name}</p>
-                
-                <p className="text-gray-600"><strong>Patient ID:</strong></p>
-                <p className="text-gray-900 font-mono text-xs">{success.patientData.patient._id}</p>
-                
-                <p className="text-gray-600"><strong>Health Card ID:</strong></p>
-                <p className="text-gray-900 font-mono">{success.patientData.healthCard.cardID}</p>
-                
-                <p className="text-gray-600"><strong>Email:</strong></p>
-                <p className="text-gray-900">{success.patientData.patient.email}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* TEMPORARY PASSWORD SECTION - IMPROVED */}
-          <div className="mt-6 bg-yellow-50 p-6 rounded-lg border-2 border-yellow-400">
-            <h4 className="font-bold text-yellow-900 mb-3 text-lg flex items-center justify-center">
-              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              Temporary Password
-            </h4>
-            <div className="bg-white p-4 rounded border-2 border-yellow-300 mb-4">
-              <p className="text-xs text-gray-600 mb-2">Password (provide this to the patient):</p>
-              <p className="text-2xl font-mono font-bold text-center text-gray-900 tracking-wider select-all">
-                {success.patientData.temporaryPassword}
-              </p>
-            </div>
-            
-            {/* ACTION BUTTONS */}
-            <div className="flex gap-3 justify-center mb-3">
-              <button
-                onClick={handleCopyPassword}
-                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                {copied ? 'Copied! ✓' : 'Copy Password'}
-              </button>
-              
-              <button
-                onClick={handlePrintCredentials}
-                className="flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors font-medium"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                </svg>
-                Print Credentials
-              </button>
-            </div>
-
-            <div className="bg-red-50 border border-red-200 rounded p-3 mt-3">
-              <p className="text-xs text-red-800 font-semibold">
-                ⚠️ IMPORTANT: The patient must change this password upon first login for security reasons.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 bg-green-50 p-4 rounded-lg border border-green-200">
-            <p className="text-sm text-green-800">
-              ✅ Confirmation email with QR code and health card details has been sent to the patient.
-            </p>
-          </div>
-
-          {/* MANUAL CLOSE BUTTON */}
-          <div className="mt-8">
-            <button
-              onClick={handleClose}
-              className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 font-bold text-lg transition-colors"
-            >
-              Done - Return to Dashboard
-            </button>
-          </div>
-
-          <p className="mt-4 text-xs text-gray-500">
-            Please ensure you have saved or provided the password to the patient before closing this window.
-          </p>
-        </div>
-      </div>
+      <RegistrationSuccess 
+        successData={success}
+        onClose={handleClose}
+      />
     );
   }
 
@@ -269,196 +121,130 @@ const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Personal Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Full Name *
-            </label>
-            <input
-              type="text"
-              name="name"
-              required
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
-              value={formData.name}
-              onChange={handleChange}
-              placeholder="Enter patient's full name"
-            />
-            {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Email Address *
-            </label>
-            <input
-              type="email"
-              name="email"
-              required
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.email ? 'border-red-500' : 'border-gray-300'
-              }`}
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="patient@example.com"
-            />
-            {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Contact Number *
-            </label>
-            <input
-              type="tel"
-              name="contactInfo"
-              required
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.contactInfo ? 'border-red-500' : 'border-gray-300'
-              }`}
-              value={formData.contactInfo}
-              onChange={handleChange}
-              placeholder="+1234567890"
-            />
-            {errors.contactInfo && <p className="text-red-500 text-sm mt-1">{errors.contactInfo}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              NIC Number
-            </label>
-            <input
-              type="text"
-              name="nicNumber"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.nicNumber}
-              onChange={handleChange}
-              placeholder="Optional"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date of Birth *
-            </label>
-            <input
-              type="date"
-              name="DOB"
-              required
-              className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                errors.DOB ? 'border-red-500' : 'border-gray-300'
-              }`}
-              value={formData.DOB}
-              onChange={handleChange}
-            />
-            {errors.DOB && <p className="text-red-500 text-sm mt-1">{errors.DOB}</p>}
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Gender
-            </label>
-            <select
-              name="gender"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.gender}
-              onChange={handleChange}
-            >
-              <option value="">Select gender</option>
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-              <option value="Prefer not to say">Prefer not to say</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Blood Group
-            </label>
-            <select
-              name="bloodGroup"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.bloodGroup}
-              onChange={handleChange}
-            >
-              <option value="">Select blood group</option>
-              <option value="A+">A+</option>
-              <option value="A-">A-</option>
-              <option value="B+">B+</option>
-              <option value="B-">B-</option>
-              <option value="AB+">AB+</option>
-              <option value="AB-">AB-</option>
-              <option value="O+">O+</option>
-              <option value="O-">O-</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Emergency Contact
-            </label>
-            <input
-              type="tel"
-              name="emergencyContact"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              value={formData.emergencyContact}
-              onChange={handleChange}
-              placeholder="Emergency contact number"
-            />
-          </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Address *
-          </label>
-          <textarea
-            name="address"
+          <FormInput
+            label="Full Name"
+            name="name"
             required
-            rows="2"
-            className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-              errors.address ? 'border-red-500' : 'border-gray-300'
-            }`}
-            value={formData.address}
+            value={formData.name}
             onChange={handleChange}
-            placeholder="Enter complete address"
+            error={errors.name}
+            placeholder="Enter patient's full name"
           />
-          {errors.address && <p className="text-red-500 text-sm mt-1">{errors.address}</p>}
+
+          <FormInput
+            label="Email Address"
+            name="email"
+            type="email"
+            required
+            value={formData.email}
+            onChange={handleChange}
+            error={errors.email}
+            placeholder="patient@example.com"
+          />
+
+          <FormInput
+            label="Contact Number"
+            name="contactInfo"
+            type="tel"
+            required
+            value={formData.contactInfo}
+            onChange={handleChange}
+            error={errors.contactInfo}
+            placeholder="+1234567890"
+          />
+
+          <FormInput
+            label="NIC Number"
+            name="nicNumber"
+            value={formData.nicNumber}
+            onChange={handleChange}
+            placeholder="Optional"
+          />
+
+          <FormInput
+            label="Date of Birth"
+            name="DOB"
+            type="date"
+            required
+            value={formData.DOB}
+            onChange={handleChange}
+            error={errors.DOB}
+          />
+
+          <FormSelect
+            label="Gender"
+            name="gender"
+            value={formData.gender}
+            onChange={handleChange}
+            options={[
+              { value: '', label: 'Select gender' },
+              { value: 'Male', label: 'Male' },
+              { value: 'Female', label: 'Female' },
+              { value: 'Other', label: 'Other' },
+              { value: 'Prefer not to say', label: 'Prefer not to say' }
+            ]}
+          />
+
+          <FormSelect
+            label="Blood Group"
+            name="bloodGroup"
+            value={formData.bloodGroup}
+            onChange={handleChange}
+            options={[
+              { value: '', label: 'Select blood group' },
+              { value: 'A+', label: 'A+' },
+              { value: 'A-', label: 'A-' },
+              { value: 'B+', label: 'B+' },
+              { value: 'B-', label: 'B-' },
+              { value: 'AB+', label: 'AB+' },
+              { value: 'AB-', label: 'AB-' },
+              { value: 'O+', label: 'O+' },
+              { value: 'O-', label: 'O-' }
+            ]}
+          />
+
+          <FormInput
+            label="Emergency Contact"
+            name="emergencyContact"
+            type="tel"
+            value={formData.emergencyContact}
+            onChange={handleChange}
+            placeholder="Emergency contact number"
+          />
         </div>
+
+        <FormTextarea
+          label="Address"
+          name="address"
+          required
+          value={formData.address}
+          onChange={handleChange}
+          error={errors.address}
+          placeholder="Enter complete address"
+          rows={2}
+        />
 
         {/* Medical Information */}
         <div className="border-t pt-4 mt-4">
           <h3 className="text-lg font-semibold text-gray-900 mb-3">Medical Information</h3>
           
           <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allergies
-              </label>
-              <input
-                type="text"
-                name="allergies"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={formData.allergies}
-                onChange={handleChange}
-                placeholder="List any known allergies (optional)"
-              />
-            </div>
+            <FormInput
+              label="Allergies"
+              name="allergies"
+              value={formData.allergies}
+              onChange={handleChange}
+              placeholder="List any known allergies (optional)"
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Medical History
-              </label>
-              <textarea
-                name="medicalHistory"
-                rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                value={formData.medicalHistory}
-                onChange={handleChange}
-                placeholder="Enter relevant medical history (optional)"
-              />
-            </div>
+            <FormTextarea
+              label="Medical History"
+              name="medicalHistory"
+              value={formData.medicalHistory}
+              onChange={handleChange}
+              placeholder="Enter relevant medical history (optional)"
+              rows={3}
+            />
           </div>
         </div>
 
@@ -486,5 +272,67 @@ const PatientRegistrationForm = ({ onSuccess, onCancel }) => {
     </div>
   );
 };
+
+// Reusable Form Components (following ISP)
+const FormInput = ({ label, name, type = 'text', required, value, onChange, error, placeholder }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      {label} {required && '*'}
+    </label>
+    <input
+      type={type}
+      name={name}
+      required={required}
+      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+    />
+    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+  </div>
+);
+
+const FormSelect = ({ label, name, value, onChange, options, error }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      {label}
+    </label>
+    <select
+      name={name}
+      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}
+      value={value}
+      onChange={onChange}
+    >
+      {options.map(opt => (
+        <option key={opt.value} value={opt.value}>{opt.label}</option>
+      ))}
+    </select>
+    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+  </div>
+);
+
+const FormTextarea = ({ label, name, required, value, onChange, error, placeholder, rows = 3 }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">
+      {label} {required && '*'}
+    </label>
+    <textarea
+      name={name}
+      required={required}
+      rows={rows}
+      className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+        error ? 'border-red-500' : 'border-gray-300'
+      }`}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+    />
+    {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+  </div>
+);
 
 export default PatientRegistrationForm;

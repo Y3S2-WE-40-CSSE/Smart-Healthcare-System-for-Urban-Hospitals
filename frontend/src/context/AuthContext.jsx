@@ -1,11 +1,12 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import { authAPI } from '../services/api';
+import storageService from '../services/storageService';
 
 const AuthContext = createContext();
 
 const initialState = {
   user: null,
-  token: localStorage.getItem('token'),
+  token: storageService.getItem('token'),
   isAuthenticated: false,
   loading: true,
 };
@@ -14,8 +15,8 @@ const authReducer = (state, action) => {
   switch (action.type) {
     case 'LOGIN_SUCCESS':
     case 'REGISTER_SUCCESS':
-      localStorage.setItem('token', action.payload.token);
-      localStorage.setItem('user', JSON.stringify(action.payload.user));
+      storageService.setItem('token', action.payload.token);
+      storageService.setJSON('user', action.payload.user);
       return {
         ...state,
         user: action.payload.user,
@@ -24,8 +25,8 @@ const authReducer = (state, action) => {
         loading: false,
       };
     case 'LOGOUT':
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      storageService.removeItem('token');
+      storageService.removeItem('user');
       return {
         ...state,
         user: null,
@@ -41,8 +42,8 @@ const authReducer = (state, action) => {
         loading: false,
       };
     case 'AUTH_ERROR':
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      storageService.removeItem('token');
+      storageService.removeItem('user');
       return {
         ...state,
         user: null,
@@ -63,10 +64,9 @@ const authReducer = (state, action) => {
 export const AuthProvider = ({ children }) => {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Load user on app start
   useEffect(() => {
     const loadUser = async () => {
-      const token = localStorage.getItem('token');
+      const token = storageService.getItem('token');
       if (token) {
         try {
           const response = await authAPI.getMe();
@@ -85,7 +85,6 @@ export const AuthProvider = ({ children }) => {
     loadUser();
   }, []);
 
-  // Login user
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
@@ -103,34 +102,25 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Register user
   const register = async (userData) => {
     try {
-      console.log('📤 Sending registration data:', userData); // DEBUG LOG
       const response = await authAPI.register(userData);
-      console.log('✅ Registration success:', response.data); // DEBUG LOG
-      
       dispatch({
         type: 'REGISTER_SUCCESS',
         payload: response.data.data,
       });
       return { success: true };
     } catch (error) {
-      console.error('❌ Registration error:', error.response?.data); // DEBUG LOG
-      
       dispatch({ type: 'AUTH_ERROR' });
-      
-      // ⭐ RETURN COMPLETE ERROR OBJECT INCLUDING errorsByField
       return {
         success: false,
         message: error.response?.data?.message || 'Registration failed',
         errors: error.response?.data?.errors || [],
-        errorsByField: error.response?.data?.errorsByField || {} // ADD THIS LINE
+        errorsByField: error.response?.data?.errorsByField || {}
       };
     }
   };
 
-  // Logout user
   const logout = () => {
     dispatch({ type: 'LOGOUT' });
   };
