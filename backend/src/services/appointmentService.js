@@ -1,12 +1,46 @@
+// services/appointmentService.js
 const Appointment = require('../models/appointmentModel');
 const User = require('../models/userModel');
+const TimeSlotService = require('./timeSlotService');
 
 class AppointmentService {
   /**
-   * Create new appointment
+   * Create new appointment with time slot validation
    */
   static async createAppointment(appointmentData) {
-    const appointment = await Appointment.create(appointmentData);
+    const { doctorID, dateTime, duration = 30 } = appointmentData;
+    
+    // Validate time slot availability
+    const isSlotAvailable = await TimeSlotService.validateTimeSlot(
+      doctorID, 
+      dateTime, 
+      duration
+    );
+    
+    if (!isSlotAvailable) {
+      throw new Error('The selected time slot is no longer available. Please choose another time.');
+    }
+
+    // Validate working hours
+    const workingHours = TimeSlotService.getWorkingHours(dateTime);
+    if (!workingHours) {
+      throw new Error('Appointments are not available on Sundays.');
+    }
+
+    const appointmentHour = new Date(dateTime).getHours();
+    const appointmentMinute = new Date(dateTime).getMinutes();
+    
+    if (appointmentHour < workingHours.start.hour || 
+        (appointmentHour === workingHours.end.hour && appointmentMinute >= workingHours.end.minute) ||
+        appointmentHour > workingHours.end.hour) {
+      throw new Error(`Appointments are only available between ${workingHours.start.hour}:00 and ${workingHours.end.hour}:00`);
+    }
+
+    const appointment = await Appointment.create({
+      ...appointmentData,
+      duration: duration
+    });
+    
     return await appointment.populate([
       { path: 'patientID', select: 'name contactInfo' },
       { path: 'doctorID', select: 'name specialization department' }
@@ -66,16 +100,10 @@ class AppointmentService {
   }
 
   /**
-   * Check for scheduling conflicts
+   * Check for scheduling conflicts (legacy method - now using TimeSlotService)
    */
   static async checkSchedulingConflict(doctorId, dateTime) {
-    const appointmentTime = new Date(dateTime);
-    
-    return await Appointment.findOne({
-      doctorID: doctorId,
-      dateTime: appointmentTime,
-      status: { $in: ['scheduled', 'confirmed'] }
-    });
+    return !(await TimeSlotService.validateTimeSlot(doctorId, dateTime, 30));
   }
 
   /**
@@ -133,6 +161,13 @@ class AppointmentService {
     return await User.find({ role: 'doctor', isActive: true })
       .select('name specialization department contactInfo licenseNumber')
       .sort({ name: 1 });
+  }
+
+  /**
+   * Get available time slots for a doctor
+   */
+  static async getAvailableTimeSlots(doctorId, date, duration = 30) {
+    return await TimeSlotService.getAvailableSlots(doctorId, date, duration);
   }
 
   /**

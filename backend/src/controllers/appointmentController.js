@@ -1,4 +1,6 @@
+// controllers/appointmentController.js
 const AppointmentService = require('../services/appointmentService');
+const TimeSlotService = require('../services/timeSlotService');
 const ErrorHandlerService = require('../services/errorHandlerService');
 const ValidationService = require('../services/validationService');
 
@@ -13,21 +15,12 @@ const createAppointment = async (req, res) => {
       return res.status(400).json(errorResponse);
     }
 
-    const { doctorID, department, dateTime, reason, notes } = req.body;
+    const { doctorID, department, dateTime, reason, notes, duration = 30 } = req.body;
 
     // Validate appointment time
     AppointmentService.validateAppointmentTime(dateTime);
 
-    // Check for scheduling conflicts
-    const conflict = await AppointmentService.checkSchedulingConflict(doctorID, dateTime);
-    if (conflict) {
-      return res.status(400).json({
-        success: false,
-        message: 'Doctor is not available at this time. Please choose another time.'
-      });
-    }
-
-    // Create appointment
+    // Create appointment with time slot validation
     const appointmentData = {
       patientID: req.user._id,
       doctorID,
@@ -35,6 +28,7 @@ const createAppointment = async (req, res) => {
       dateTime: new Date(dateTime),
       reason,
       notes,
+      duration: parseInt(duration),
       createdBy: req.user._id
     };
 
@@ -48,6 +42,43 @@ const createAppointment = async (req, res) => {
     res.status(201).json(response);
   } catch (error) {
     const errorResponse = ErrorHandlerService.handleError(error, 'Create appointment');
+    res.status(400).json(errorResponse); // Changed to 400 for validation errors
+  }
+};
+
+// @desc    Get available time slots for a doctor
+// @route   GET /api/appointments/doctors/:doctorId/slots
+// @access  Private
+const getAvailableSlots = async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    const { date, duration = 30 } = req.query;
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: 'Date parameter is required'
+      });
+    }
+
+    const availableSlots = await TimeSlotService.getAvailableSlots(
+      doctorId, 
+      date, 
+      parseInt(duration)
+    );
+
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Available time slots retrieved successfully',
+      { 
+        availableSlots,
+        date,
+        duration: parseInt(duration)
+      }
+    );
+
+    res.status(200).json(response);
+  } catch (error) {
+    const errorResponse = ErrorHandlerService.handleError(error, 'Get available slots');
     res.status(500).json(errorResponse);
   }
 };
@@ -243,5 +274,6 @@ module.exports = {
   cancelAppointment,
   getDoctorAppointments,
   getPatientAppointments,
-  getAvailableDoctors
+  getAvailableDoctors,
+  getAvailableSlots
 };

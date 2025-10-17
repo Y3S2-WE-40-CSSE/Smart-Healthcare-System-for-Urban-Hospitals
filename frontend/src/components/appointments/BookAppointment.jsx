@@ -4,12 +4,17 @@ import { useNavigate } from 'react-router-dom';
 
 const BookAppointment = () => {
   const [doctors, setDoctors] = useState([]);
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDuration, setSelectedDuration] = useState(30);
   const [formData, setFormData] = useState({
     doctorID: '',
     department: '',
     dateTime: '',
     reason: '',
-    notes: ''
+    notes: '',
+    duration: 30
   });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
@@ -46,6 +51,105 @@ const BookAppointment = () => {
     }
   };
 
+  const fetchAvailableSlots = async (doctorId, date, duration) => {
+    if (!doctorId || !date) return;
+    
+    setLoadingSlots(true);
+    setAvailableSlots([]);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(
+        `http://localhost:5000/api/appointments/doctors/${doctorId}/slots?date=${date}&duration=${duration}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAvailableSlots(data.data.availableSlots);
+      } else {
+        setErrors({ slots: data.message || 'Failed to load available slots' });
+      }
+    } catch (error) {
+      console.error('Error fetching available slots:', error);
+      setErrors({ slots: 'Failed to load available time slots' });
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const handleDoctorChange = (e) => {
+    const value = e.target.value;
+    setFormData(prev => ({
+      ...prev,
+      doctorID: value,
+      dateTime: '' // Reset time slot when doctor changes
+    }));
+    
+    const selectedDoctor = doctors.find(doc => doc._id === value);
+    if (selectedDoctor) {
+      setFormData(prev => ({
+        ...prev,
+        department: selectedDoctor.department
+      }));
+    }
+
+    // Fetch slots if date is already selected
+    if (selectedDate && value) {
+      fetchAvailableSlots(value, selectedDate, selectedDuration);
+    }
+
+    if (errors.doctorID) {
+      setErrors(prev => ({ ...prev, doctorID: '' }));
+    }
+  };
+
+  const handleDateChange = (e) => {
+    const date = e.target.value;
+    setSelectedDate(date);
+    
+    // Fetch slots if doctor is already selected
+    if (formData.doctorID && date) {
+      fetchAvailableSlots(formData.doctorID, date, selectedDuration);
+    }
+
+    setFormData(prev => ({
+      ...prev,
+      dateTime: '' // Reset selected time slot when date changes
+    }));
+  };
+
+  const handleDurationChange = (e) => {
+    const duration = parseInt(e.target.value);
+    setSelectedDuration(duration);
+    setFormData(prev => ({
+      ...prev,
+      duration: duration,
+      dateTime: '' // Reset selected time slot when duration changes
+    }));
+
+    // Refetch slots with new duration
+    if (formData.doctorID && selectedDate) {
+      fetchAvailableSlots(formData.doctorID, selectedDate, duration);
+    }
+  };
+
+  const handleTimeSlotSelect = (slotTime) => {
+    setFormData(prev => ({
+      ...prev,
+      dateTime: slotTime
+    }));
+    
+    if (errors.dateTime) {
+      setErrors(prev => ({ ...prev, dateTime: '' }));
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
@@ -60,16 +164,6 @@ const BookAppointment = () => {
         return newErrors;
       });
     }
-
-    if (name === 'doctorID') {
-      const selectedDoctor = doctors.find(doc => doc._id === value);
-      if (selectedDoctor) {
-        setFormData(prev => ({
-          ...prev,
-          department: selectedDoctor.department
-        }));
-      }
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -80,7 +174,7 @@ const BookAppointment = () => {
     const newErrors = {};
     if (!formData.doctorID) newErrors.doctorID = 'Please select a doctor';
     if (!formData.department) newErrors.department = 'Department is required';
-    if (!formData.dateTime) newErrors.dateTime = 'Please select date and time';
+    if (!formData.dateTime) newErrors.dateTime = 'Please select an available time slot';
     if (!formData.reason.trim()) newErrors.reason = 'Reason for appointment is required';
 
     if (Object.keys(newErrors).length > 0) {
@@ -121,6 +215,26 @@ const BookAppointment = () => {
     }
   };
 
+  const formatTimeSlot = (dateTime) => {
+    const date = new Date(dateTime);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatDisplayDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString + 'T00:00:00');
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   if (fetchingDoctors) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -134,7 +248,7 @@ const BookAppointment = () => {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="mb-8">
           <button 
@@ -183,7 +297,7 @@ const BookAppointment = () => {
                   name="doctorID"
                   required
                   value={formData.doctorID}
-                  onChange={handleChange}
+                  onChange={handleDoctorChange}
                   className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 ${
                     errors.doctorID ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
@@ -221,36 +335,135 @@ const BookAppointment = () => {
                     errors.department ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                   placeholder="e.g., Cardiology, Neurology, Pediatrics"
+                  readOnly
                 />
                 {errors.department && (
                   <p className="text-red-600 text-sm mt-2">{errors.department}</p>
                 )}
               </div>
 
-              {/* Date and Time */}
+              {/* Appointment Duration */}
               <div>
-                <label htmlFor="dateTime" className="block text-sm font-medium text-gray-700 mb-3">
-                  Preferred Date & Time *
+                <label htmlFor="duration" className="block text-sm font-medium text-gray-700 mb-3">
+                  Appointment Duration *
+                </label>
+                <select
+                  id="duration"
+                  name="duration"
+                  value={selectedDuration}
+                  onChange={handleDurationChange}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                >
+                  <option value={15}>15 minutes</option>
+                  <option value={30}>30 minutes</option>
+                  <option value={45}>45 minutes</option>
+                  <option value={60}>60 minutes</option>
+                </select>
+                <p className="text-sm text-gray-500 mt-2">
+                  Select how long you need for your appointment
+                </p>
+              </div>
+
+              {/* Date Selection */}
+              <div>
+                <label htmlFor="appointmentDate" className="block text-sm font-medium text-gray-700 mb-3">
+                  Select Date *
                 </label>
                 <input
-                  type="datetime-local"
-                  id="dateTime"
-                  name="dateTime"
+                  type="date"
+                  id="appointmentDate"
+                  name="appointmentDate"
                   required
-                  value={formData.dateTime}
-                  onChange={handleChange}
-                  min={new Date().toISOString().slice(0, 16)}
+                  value={selectedDate}
+                  onChange={handleDateChange}
+                  min={new Date().toISOString().split('T')[0]}
                   className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 ${
                     errors.dateTime ? 'border-red-500 bg-red-50' : 'border-gray-300'
                   }`}
                 />
-                {errors.dateTime && (
-                  <p className="text-red-600 text-sm mt-2">{errors.dateTime}</p>
+                {selectedDate && (
+                  <p className="text-sm text-blue-600 mt-2 font-medium">
+                    {formatDisplayDate(selectedDate)}
+                  </p>
                 )}
-                <p className="text-sm text-gray-500 mt-2">
-                  Please select a future date and time for your appointment
-                </p>
               </div>
+
+              {/* Time Slot Selection */}
+              {(formData.doctorID && selectedDate) && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Available Time Slots {loadingSlots && '(Loading...)'}
+                  </label>
+                  
+                  {errors.slots && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+                      <div className="flex items-center">
+                        <svg className="w-5 h-5 text-yellow-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span className="text-yellow-800">{errors.slots}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {loadingSlots ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {[...Array(8)].map((_, index) => (
+                        <div key={index} className="h-14 bg-gray-200 rounded-lg animate-pulse"></div>
+                      ))}
+                    </div>
+                  ) : availableSlots.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                      {availableSlots.map((slot, index) => (
+                        <button
+                          key={index}
+                          type="button"
+                          onClick={() => handleTimeSlotSelect(slot)}
+                          className={`p-3 border-2 rounded-xl text-center transition-all duration-200 font-medium ${
+                            formData.dateTime === slot
+                              ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                              : 'border-gray-300 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-25'
+                          }`}
+                        >
+                          {formatTimeSlot(slot)}
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-xl">
+                      <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-gray-500">No available slots for this date and duration</p>
+                      <p className="text-sm text-gray-400 mt-1">Please try a different date or duration</p>
+                    </div>
+                  )}
+
+                  {formData.dateTime && (
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-green-800 font-medium">Selected Time</p>
+                          <p className="text-green-600">{formatTimeSlot(formData.dateTime)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, dateTime: '' }))}
+                          className="text-green-600 hover:text-green-800"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {errors.dateTime && (
+                    <p className="text-red-600 text-sm mt-2">{errors.dateTime}</p>
+                  )}
+                </div>
+              )}
 
               {/* Reason for Appointment */}
               <div>
@@ -297,7 +510,7 @@ const BookAppointment = () => {
               <div className="flex space-x-4 pt-6 border-t border-gray-200">
                 <button
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !formData.dateTime}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-4 px-6 rounded-xl font-semibold transition-colors duration-200 flex items-center justify-center"
                 >
                   {loading ? (
@@ -338,25 +551,25 @@ const BookAppointment = () => {
               <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Select a doctor from your preferred department</span>
+              <span>Select a doctor and choose your preferred appointment duration</span>
             </div>
             <div className="flex items-start">
               <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Choose a convenient date and time for your visit</span>
+              <span>Pick a date to see available time slots</span>
+            </div>
+            <div className="flex items-start">
+              <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>Click on an available time slot to select it</span>
             </div>
             <div className="flex items-start">
               <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <span>Provide detailed information about your health concerns</span>
-            </div>
-            <div className="flex items-start">
-              <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span>You can cancel appointments up to 24 hours in advance</span>
             </div>
           </div>
         </div>
