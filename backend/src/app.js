@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const patientRoutes = require('./routes/patientRoutes');
+const medicalRecordRoutes = require('./routes/medicalRecordRoutes'); // ✅ ADD THIS
 
 const app = express();
 
@@ -50,6 +51,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/patients', patientRoutes);
+app.use('/api/medical-records', medicalRecordRoutes); // ✅ ADD THIS LINE
 
 // Health check route
 app.get('/api/health', (req, res) => {
