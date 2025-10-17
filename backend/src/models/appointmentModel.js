@@ -95,6 +95,7 @@ const appointmentSchema = new mongoose.Schema({
   }
 });
 
+// Update the updatedAt field on save
 appointmentSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
