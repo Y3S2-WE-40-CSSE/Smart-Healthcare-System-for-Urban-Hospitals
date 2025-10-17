@@ -1,8 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 const PatientDashboard = () => {
   const { user } = useAuth();
+
+  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">
@@ -38,6 +41,7 @@ const PatientDashboard = () => {
           <button className="btn-primary w-full">View Records</button>
         </div>
 
+          {/* Book Appointment */}
         <div className="card hover:shadow-lg transition-shadow duration-200">
           <div className="flex items-center mb-4">
             <div className="bg-purple-100 p-3 rounded-full">
@@ -45,10 +49,34 @@ const PatientDashboard = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3a4 4 0 118 0v4m-4 8a4 4 0 11-8 0v-4m0 0h8m-8 0V7a4 4 0 118 0v4" />
               </svg>
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 ml-3">Appointments</h3>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">Book Appointment</h3>
           </div>
-          <p className="text-gray-600 mb-4">Schedule and manage appointments</p>
-          <button className="btn-primary w-full">Book Appointment</button>
+          <p className="text-gray-600 mb-4">Schedule a new healthcare appointment</p>
+          <button 
+            onClick={() => navigate('/book-appointment')}
+            className="btn-primary w-full"
+          >
+            Book Appointment
+          </button>
+        </div>
+
+          {/* My Appointments Card */}
+        <div className="card hover:shadow-lg transition-shadow duration-200">
+          <div className="flex items-center mb-4">
+            <div className="bg-blue-100 p-3 rounded-full">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 ml-3">My Appointments</h3>
+          </div>
+          <p className="text-gray-600 mb-4">View and manage your appointments</p>
+          <button 
+            onClick={() => navigate('/appointments')}
+            className="btn-primary w-full"
+          >
+            View Appointments
+          </button>
         </div>
 
         <div className="card hover:shadow-lg transition-shadow duration-200">

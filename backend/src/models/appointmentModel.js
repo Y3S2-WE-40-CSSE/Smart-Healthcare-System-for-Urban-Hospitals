@@ -1,6 +1,15 @@
+// models/appointmentModel.js
 const mongoose = require('mongoose');
 
 const appointmentSchema = new mongoose.Schema({
+  appointmentID: {
+    type: String,
+    required: true,
+    unique: true,
+    default: function() {
+      return 'APT' + Date.now() + Math.floor(Math.random() * 1000);
+    }
+  },
   patientID: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -15,41 +24,66 @@ const appointmentSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  appointmentDate: {
+  dateTime: {
     type: Date,
-    required: true
+    required: true,
+    validate: {
+      validator: function(dateTime) {
+        // Validate working hours (9 AM - 5 PM)
+        const hour = dateTime.getHours();
+        const minute = dateTime.getMinutes();
+        const day = dateTime.getDay();
+        
+        // Sunday closed
+        if (day === 0) return false;
+        
+        // Saturday: 9 AM - 1 PM
+        if (day === 6) {
+          return hour >= 9 && (hour < 13 || (hour === 13 && minute === 0));
+        }
+        
+        // Weekdays: 9 AM - 5 PM
+        return hour >= 9 && hour < 17;
+      },
+      message: 'Appointments must be scheduled during working hours (Mon-Fri: 9AM-5PM, Sat: 9AM-1PM)'
+    }
   },
-  appointmentTime: {
-    type: String,
-    required: true
+  duration: {
+    type: Number,
+    default: 30, // 30 minutes default
+    enum: [15, 30, 45, 60]
   },
   status: {
     type: String,
-    enum: ['scheduled', 'completed', 'cancelled', 'no-show'],
+    enum: ['scheduled', 'confirmed', 'completed', 'cancelled', 'no-show'],
     default: 'scheduled'
   },
-  serviceType: {
+  reason: {
     type: String,
-    enum: ['consultation', 'follow-up', 'emergency', 'surgery', 'diagnostic'],
     required: true
-  },
-  paymentMode: {
-    type: String,
-    enum: ['cash', 'card', 'insurance', 'online'],
-    required: true
-  },
-  paymentAmount: {
-    type: Number,
-    required: true
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'paid', 'refunded'],
-    default: 'pending'
   },
   notes: {
     type: String,
     default: ''
+  },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed', 'refunded'],
+    default: 'pending'
+  },
+  amount: {
+    type: Number,
+    default: 0
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['govt_coverage', 'insurance', 'cash', 'card', 'none'],
+    default: 'none'
+  },
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
   },
   createdAt: {
     type: Date,

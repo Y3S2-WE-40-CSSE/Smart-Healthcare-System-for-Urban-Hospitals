@@ -77,7 +77,7 @@ class PatientValidator {
         password: temporaryPassword,
         role: 'patient',
         contactInfo: contactInfo.trim(),
-        nicNumber: nicNumber || `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        nicNumber: nicNumber ? nicNumber.trim() : `TEMP_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         DOB: new Date(DOB),
         address: address.trim(),
         allergies: allergies || 'None',
