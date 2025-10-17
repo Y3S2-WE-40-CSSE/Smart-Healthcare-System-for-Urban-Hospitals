@@ -2,9 +2,9 @@ const jwt = require('jsonwebtoken');
 
 const generateToken = (id) => {
   // Check if secret exists
-  const secret = process.env.JWT_ACCESS_SECRET;
+  const secret = process.env.JWT_SECRET;
   if (!secret) {
-    throw new Error('JWT_ACCESS_SECRET is not defined in environment variables');
+    throw new Error('JWT_SECRET is not defined in environment variables');
   }
 
   return jwt.sign({ id }, secret, {

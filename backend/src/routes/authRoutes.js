@@ -3,13 +3,21 @@ const { body } = require('express-validator');
 const { 
   registerUser, 
   loginUser, 
-  getMe, 
+  getMe
+} = require('../controllers/authController');
+
+const { 
   createDoctor, 
   createAdmin 
-} = require('../controllers/authController');
+} = require('../controllers/adminUserController');
+
 const { protect, authorize } = require('../middleware/authMiddleware');
+const RoleConfigService = require('../services/roleConfigService');
 
 const router = express.Router();
+
+// Get allowed roles dynamically
+const allowedRoles = RoleConfigService.getPublicRoles();
 
 // Validation middleware
 const registerValidation = [
@@ -17,12 +25,33 @@ const registerValidation = [
   body('email').isEmail().withMessage('Please provide a valid email'),
   body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('contactInfo').notEmpty().withMessage('Contact information is required'),
-  body('role').optional().isIn(['patient', 'staff']).withMessage('Invalid role for registration'),
-  // Patient specific validations
-  body('DOB').if(body('role').equals('patient')).notEmpty().withMessage('Date of birth is required for patients'),
-  body('address').if(body('role').equals('patient')).notEmpty().withMessage('Address is required for patients'),
-  // Staff specific validations
-  body('department').if(body('role').equals('staff')).notEmpty().withMessage('Department is required for staff')
+  body('role').optional().isIn(allowedRoles).withMessage(`Invalid role. Allowed roles: ${allowedRoles.join(', ')}`),
+  
+  // Conditional validations based on role
+  body('DOB')
+    .if(body('role').equals('patient'))
+    .notEmpty()
+    .withMessage('Date of birth is required for patients'),
+  
+  body('address')
+    .if(body('role').equals('patient'))
+    .notEmpty()
+    .withMessage('Address is required for patients'),
+  
+  body('department')
+    .if(body('role').isIn(['staff', 'doctor', 'admin']))
+    .notEmpty()
+    .withMessage('Department is required'),
+  
+  body('specialization')
+    .if(body('role').equals('doctor'))
+    .notEmpty()
+    .withMessage('Specialization is required for doctors'),
+  
+  body('licenseNumber')
+    .if(body('role').equals('doctor'))
+    .notEmpty()
+    .withMessage('License number is required for doctors')
 ];
 
 const loginValidation = [
@@ -55,7 +84,7 @@ router.post('/login', loginValidation, loginUser);
 // Protected routes
 router.get('/me', protect, getMe);
 
-// Admin routes
+// Admin routes (kept for backward compatibility)
 router.post('/admin/create-doctor', protect, authorize('admin', 'administrator'), doctorValidation, createDoctor);
 
 // Super admin routes
