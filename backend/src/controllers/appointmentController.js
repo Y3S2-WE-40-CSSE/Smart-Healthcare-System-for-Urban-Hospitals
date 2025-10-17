@@ -3,6 +3,7 @@ const AppointmentService = require('../services/appointmentService');
 const TimeSlotService = require('../services/timeSlotService');
 const ErrorHandlerService = require('../services/errorHandlerService');
 const ValidationService = require('../services/validationService');
+const Appointment = require('../models/appointmentModel');
 
 // @desc    Create new appointment
 // @route   POST /api/appointments
@@ -43,6 +44,82 @@ const createAppointment = async (req, res) => {
   } catch (error) {
     const errorResponse = ErrorHandlerService.handleError(error, 'Create appointment');
     res.status(400).json(errorResponse); // Changed to 400 for validation errors
+  }
+};
+
+const createAppointmentWithPayment = async (req, res) => {
+  try {
+    const validation = ValidationService.validateRequest(req);
+    if (validation.hasErrors) {
+      const errorResponse = ValidationService.createValidationErrorResponse(validation.errors);
+      return res.status(400).json(errorResponse);
+    }
+
+    const { doctorID, department, dateTime, reason, notes, duration = 30, paymentMethod } = req.body;
+
+    // Validate appointment time
+    AppointmentService.validateAppointmentTime(dateTime);
+
+    // Create appointment data
+    const appointmentData = {
+      patientID: req.user._id,
+      doctorID,
+      department,
+      dateTime: new Date(dateTime),
+      reason,
+      notes,
+      duration: parseInt(duration),
+      createdBy: req.user._id,
+      paymentMethod: paymentMethod || 'none',
+      paymentStatus: paymentMethod ? 'pending' : 'none'
+    };
+
+    const appointment = await AppointmentService.createAppointment(appointmentData);
+
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Appointment scheduled successfully',
+      { 
+        appointment,
+        requiresPayment: !!paymentMethod
+      }
+    );
+
+    res.status(201).json(response);
+  } catch (error) {
+    const errorResponse = ErrorHandlerService.handleError(error, 'Create appointment with payment');
+    res.status(400).json(errorResponse);
+  }
+};
+
+const deleteAppointment = async (req, res) => {
+  try {
+    const appointment = await Appointment.findById(req.params.id);
+    
+    if (!appointment) {
+      return res.status(404).json({
+        success: false,
+        message: 'Appointment not found'
+      });
+    }
+
+    // Authorization check - only allow deletion of appointments in pending state
+    if (appointment.status !== 'scheduled') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only scheduled appointments can be deleted'
+      });
+    }
+
+    await Appointment.findByIdAndDelete(req.params.id);
+    
+    const response = ErrorHandlerService.createSuccessResponse(
+      'Appointment deleted successfully'
+    );
+
+    res.status(200).json(response);
+  } catch (error) {
+    const errorResponse = ErrorHandlerService.handleError(error, 'Delete appointment');
+    res.status(500).json(errorResponse);
   }
 };
 
@@ -275,5 +352,7 @@ module.exports = {
   getDoctorAppointments,
   getPatientAppointments,
   getAvailableDoctors,
-  getAvailableSlots
+  getAvailableSlots,
+  createAppointmentWithPayment,
+  deleteAppointment
 };

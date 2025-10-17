@@ -2,7 +2,7 @@
 const express = require('express');
 const { body } = require('express-validator');
 const {
-  createAppointment,
+  createAppointmentWithPayment,
   getAppointments,
   getAppointmentById,
   updateAppointment,
@@ -10,7 +10,8 @@ const {
   getDoctorAppointments,
   getPatientAppointments,
   getAvailableDoctors,
-  getAvailableSlots
+  getAvailableSlots,
+  deleteAppointment
 } = require('../controllers/appointmentController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -26,7 +27,7 @@ const appointmentValidation = [
 ];
 
 // Protected routes
-router.post('/', protect, appointmentValidation, createAppointment);
+router.post('/', protect, appointmentValidation, createAppointmentWithPayment);
 router.get('/', protect, getAppointments);
 router.get('/my-appointments', protect, getPatientAppointments);
 router.get('/doctor', protect, authorize('doctor'), getDoctorAppointments);
@@ -35,5 +36,6 @@ router.get('/doctors/:doctorId/slots', protect, getAvailableSlots);
 router.get('/:id', protect, getAppointmentById);
 router.put('/:id', protect, updateAppointment);
 router.patch('/:id/cancel', protect, cancelAppointment);
+router.delete('/:id', protect, deleteAppointment);
 
 module.exports = router;

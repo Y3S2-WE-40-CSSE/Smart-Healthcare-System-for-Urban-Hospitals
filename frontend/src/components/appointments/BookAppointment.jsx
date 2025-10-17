@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import PaymentModal from '../../components/PaymentModal';
 
 const BookAppointment = () => {
   const [doctors, setDoctors] = useState([]);
@@ -19,6 +20,8 @@ const BookAppointment = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [fetchingDoctors, setFetchingDoctors] = useState(true);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -169,6 +172,7 @@ const BookAppointment = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrors({});
+    setPaymentError('');
     setLoading(true);
 
     const newErrors = {};
@@ -183,36 +187,43 @@ const BookAppointment = () => {
       return;
     }
 
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('http://localhost:5000/api/appointments', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        navigate('/appointments', { 
-          state: { message: 'Appointment booked successfully!' } 
-        });
-      } else {
-        if (data.errorsByField) {
-          setErrors(data.errorsByField);
-        } else {
-          setErrors({ general: data.message });
-        }
-      }
-    } catch (error) {
-      console.error('Error booking appointment:', error);
-      setErrors({ general: 'Failed to book appointment. Please try again.' });
-    } finally {
-      setLoading(false);
-    }
+    // Show payment modal instead of directly submitting
+    setShowPaymentModal(true);
+    setLoading(false);
+  };
+
+  const handlePaymentSuccess = (result) => {
+    setShowPaymentModal(false);
+    
+    const successMessage = result.transaction.status === 'covered' 
+      ? 'Appointment booked successfully under government coverage!'
+      : result.transaction.status === 'paid'
+      ? `Appointment booked successfully! Payment of ${formatCurrency(result.payment.amount)} processed.`
+      : 'Appointment booked successfully! Please bring payment when you visit.';
+
+    navigate('/appointments', { 
+      state: { 
+        message: successMessage,
+        appointment: result.appointment
+      } 
+    });
+  };
+
+  const handlePaymentFailure = (errorMessage) => {
+    setPaymentError(errorMessage);
+    setShowPaymentModal(false);
+  };
+
+  const getSelectedDoctorName = () => {
+    const doctor = doctors.find(doc => doc._id === formData.doctorID);
+    return doctor ? doctor.name : '';
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount);
   };
 
   const formatTimeSlot = (dateTime) => {
@@ -266,6 +277,27 @@ const BookAppointment = () => {
             <p className="text-gray-600 mt-2">Schedule your healthcare appointment with our specialists</p>
           </div>
         </div>
+
+        {/* Payment Error Display */}
+        {paymentError && (
+          <div className="mb-6">
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center">
+                <svg className="w-5 h-5 text-red-400 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <span className="text-red-800 font-medium">Payment Failed</span>
+              </div>
+              <p className="text-red-600 text-sm mt-1">{paymentError}</p>
+              <button
+                onClick={() => setPaymentError('')}
+                className="text-red-600 hover:text-red-800 text-sm mt-2 font-medium"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main Form Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
@@ -444,7 +476,9 @@ const BookAppointment = () => {
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-green-800 font-medium">Selected Time</p>
-                          <p className="text-green-600">{formatTimeSlot(formData.dateTime)}</p>
+                          <p className="text-green-600">
+                            {new Date(formData.dateTime).toLocaleDateString()} at {formatTimeSlot(formData.dateTime)}
+                          </p>
                         </div>
                         <button
                           type="button"
@@ -519,10 +553,10 @@ const BookAppointment = () => {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
-                      Booking Appointment...
+                      Processing...
                     </>
                   ) : (
-                    'Book Appointment'
+                    'Proceed to Payment'
                   )}
                 </button>
                 <button
@@ -569,10 +603,22 @@ const BookAppointment = () => {
               <svg className="w-4 h-4 mr-2 mt-0.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span>Provide detailed information about your health concerns</span>
+              <span>Complete payment to confirm your appointment</span>
             </div>
           </div>
         </div>
+
+        {/* Payment Modal */}
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          appointmentData={{
+            ...formData,
+            doctorName: getSelectedDoctorName()
+          }}
+          onPaymentSuccess={handlePaymentSuccess}
+          onPaymentFailure={handlePaymentFailure}
+        />
       </div>
     </div>
   );
