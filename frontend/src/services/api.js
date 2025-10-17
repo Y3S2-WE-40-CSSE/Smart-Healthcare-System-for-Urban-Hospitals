@@ -62,7 +62,9 @@ export const analyticsAPI = {
   getPaymentStats: (params) => api.get('/analytics/payments', { params }),
   getPeakTimes: (params) => api.get('/analytics/peak-times', { params }),
   exportReport: (params) => api.get('/analytics/export', { params }),
-// ADD THIS NEW SECTION - Medical Record API calls
+};
+
+// Medical Record API calls
 export const medicalRecordAPI = {
   // Scan health card (QR/Barcode)
   searchByHealthCardID: (cardID) => api.post('/medical-records/scan', { cardID }),
