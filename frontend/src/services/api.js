@@ -54,4 +54,14 @@ export const patientAPI = {
   getHealthCard: (patientId) => api.get(`/patients/${patientId}/health-card`),
 };
 
+// Analytics API calls
+export const analyticsAPI = {
+  getDashboardStats: () => api.get('/analytics/dashboard'),
+  getPatientFlow: (params) => api.get('/analytics/patient-flow', { params }),
+  getAppointmentStats: (params) => api.get('/analytics/appointments', { params }),
+  getPaymentStats: (params) => api.get('/analytics/payments', { params }),
+  getPeakTimes: (params) => api.get('/analytics/peak-times', { params }),
+  exportReport: (params) => api.get('/analytics/export', { params }),
+};
+
 export default api;

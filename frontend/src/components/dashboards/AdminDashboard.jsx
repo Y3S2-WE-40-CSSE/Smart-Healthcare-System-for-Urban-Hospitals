@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import AnalyticsModal from '../AnalyticsModal';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
 
   return (
     <div className="space-y-6">
@@ -37,7 +39,12 @@ const AdminDashboard = () => {
             <h3 className="text-lg font-semibold text-gray-900 ml-3">System Analytics</h3>
           </div>
           <p className="text-gray-600 mb-4">View system usage and analytics</p>
-          <button className="btn-primary w-full">View Analytics</button>
+          <button 
+            onClick={() => setShowAnalyticsModal(true)}
+            className="btn-primary w-full"
+          >
+            View Analytics
+          </button>
         </div>
 
         <div className="card hover:shadow-lg transition-shadow duration-200">
@@ -137,6 +144,12 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Analytics Modal */}
+      <AnalyticsModal 
+        isOpen={showAnalyticsModal}
+        onClose={() => setShowAnalyticsModal(false)}
+      />
     </div>
   );
 };
